@@ -108,15 +108,20 @@ app.get('/api/fetch-content', async (req, res) => {
     const dom = new JSDOM(html);
     const document = dom.window.document;
     
-    // chapter-contentクラスを持つ要素を探す
-    const contentElement = Array.from(document.getElementsByTagName('*'))
-      .find(el => el.classList.contains('chapter-content'));
+    // 要件に合わせてクラス名を変更
+    const titleElement = document.querySelector('.widget-episodeTitle');
+    const contentElement = document.querySelector('.widget-episodeBody');
     
     if (!contentElement) {
       throw new Error('本文が見つかりませんでした。');
     }
-    
-    res.json({ success: true, content: contentElement.innerHTML });
+
+    // タイトルと本文の両方を返す
+    res.json({ 
+      success: true, 
+      title: titleElement ? titleElement.textContent.trim() : '',
+      content: contentElement.innerHTML 
+    });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ 
