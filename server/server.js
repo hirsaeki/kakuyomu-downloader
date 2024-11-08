@@ -25,9 +25,9 @@ app.get('/api/fetch-episodes', async (req, res) => {
     const dom = new JSDOM(html);
     const document = dom.window.document;
 
-    let episodeMap = new Map(); // URLをキーとしてエピソードを管理
+    let episodeMap = new Map();
 
-    // 作品タイトルを探す（Headingクラスを持つ要素を検索）
+    // 作品タイトルを探す
     const workTitleElement = Array.from(document.getElementsByTagName('*'))
       .find(el => Array.from(el.classList)
         .some(className => className.startsWith('Heading_heading')));
@@ -41,7 +41,7 @@ app.get('/api/fetch-episodes', async (req, res) => {
       .filter(el => Array.from(el.classList)
         .some(className => className.startsWith('NewBox_padding')));
 
-    // 有効なグループ（エピソードを含むグループ）のみを処理
+    // 有効なグループのみを処理
     const validGroups = episodeGroups.filter(group => {
       const episodeLinks = Array.from(group.getElementsByTagName('a'))
         .filter(el => Array.from(el.classList)
@@ -54,7 +54,6 @@ app.get('/api/fetch-episodes', async (req, res) => {
       const groupTitleElement = group.querySelector('h3');
       const groupTitle = groupTitleElement ? groupTitleElement.textContent.trim() : '';
 
-      // グループ内のエピソードリンクを探す
       const episodeLinks = Array.from(group.getElementsByTagName('a'))
         .filter(el => Array.from(el.classList)
           .some(className => className.startsWith('WorkTocSection_link')));
@@ -68,7 +67,6 @@ app.get('/api/fetch-episodes', async (req, res) => {
         const href = node.getAttribute('href');
         const episodeUrl = `https://kakuyomu.jp${href}`;
 
-        // URLが存在しないか、既存のエピソードにグループタイトルがない場合のみ追加/更新
         const existingEpisode = episodeMap.get(episodeUrl);
         if (!existingEpisode || (existingEpisode && !existingEpisode.groupTitle && groupTitle)) {
           episodeMap.set(episodeUrl, {
@@ -108,7 +106,6 @@ app.get('/api/fetch-content', async (req, res) => {
     const dom = new JSDOM(html);
     const document = dom.window.document;
     
-    // 要件に合わせてクラス名を変更
     const titleElement = document.querySelector('.widget-episodeTitle');
     const contentElement = document.querySelector('.widget-episodeBody');
     
@@ -116,7 +113,6 @@ app.get('/api/fetch-content', async (req, res) => {
       throw new Error('本文が見つかりませんでした。');
     }
 
-    // タイトルと本文の両方を返す
     res.json({ 
       success: true, 
       title: titleElement ? titleElement.textContent.trim() : '',

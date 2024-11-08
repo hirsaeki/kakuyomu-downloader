@@ -3,38 +3,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-
-const RETRY_COUNT = 3;
-const RETRY_DELAY = 2000;
-const REQUEST_INTERVAL = 1000;
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const fetchEpisodeWithRetry = async (url, retryCount = RETRY_COUNT) => {
-  for (let i = 0; i < retryCount; i++) {
-    try {
-      const response = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
-      const data = await response.json();
-
-      if (data.success) {
-        if (i > 0) {
-          console.log(`リトライ成功 (${i + 1}回目): ${url}`);
-        }
-        return data;
-      } else {
-        throw new Error(data.error);
-      }
-    } catch (error) {
-      console.error(`試行 ${i + 1}/${retryCount} 失敗:`, error);
-
-      if (i === retryCount - 1) {
-        throw error;
-      }
-
-      await sleep(RETRY_DELAY);
-    }
-  }
-};
+import {
+  fetchEpisodeWithRetry,
+  fetchEpisodeList,
+  sleep,
+  getWaitTime,
+  Constants
+} from '../lib/episodeFetcher';
+import generateEpub from '../lib/epubGenerator';
+import db from '../lib/database';
 
 const KakuyomuDownloader = () => {
   const [url, setUrl] = useState('');
@@ -46,27 +23,22 @@ const KakuyomuDownloader = () => {
   const [showGroupTitles, setShowGroupTitles] = useState(true);
   const [downloadStatus, setDownloadStatus] = useState({});
   const [currentProgress, setCurrentProgress] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
-  const fetchEpisodes = async () => {
+  const handleFetchEpisodes = async () => {
     if (!url) return;
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/fetch-episodes?url=${encodeURIComponent(url)}`);
-      const data = await response.json();
-
-      if (data.success) {
-        console.log('取得した作品情報:', data);
-        setWorkTitle(data.workTitle);
-        setEpisodes(data.episodes.map(ep => ({ ...ep, selected: false })));
-        const initialStatus = {};
-        data.episodes.forEach(ep => {
-          initialStatus[ep.id] = { status: 'pending', error: null };
-        });
-        setDownloadStatus(initialStatus);
-      } else {
-        throw new Error(data.error);
-      }
+      const data = await fetchEpisodeList(url);
+      setWorkTitle(data.workTitle);
+      setEpisodes(data.episodes.map(ep => ({ ...ep, selected: false })));
+      const initialStatus = {};
+      data.episodes.forEach(ep => {
+        initialStatus[ep.id] = { status: 'pending', error: null };
+      });
+      setDownloadStatus(initialStatus);
     } catch (error) {
       console.error('Error:', error);
       alert('エピソード一覧の取得に失敗しました');
@@ -108,7 +80,33 @@ const KakuyomuDownloader = () => {
     }
   };
 
-  const downloadEpub = async () => {
+  const handleClearCache = async () => {
+    if (!url) return;
+
+    if (!confirm('この作品のキャッシュをすべて削除しますか？\nダウンロードの際に再度サーバーからデータを取得する必要があります。')) {
+      return;
+    }
+
+    setClearing(true);
+    try {
+      await db.clearWorkCache(url);
+
+      // 状態をリセット
+      setEpisodes([]);
+      setWorkTitle('');
+      setDownloadStatus({});
+      setSelectAll(false);
+
+      alert('キャッシュを削除しました。');
+    } catch (error) {
+      console.error('キャッシュ削除エラー:', error);
+      alert('キャッシュの削除に失敗しました。');
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const handleDownload = async () => {
     const selectedEpisodes = episodes.filter(ep => ep.selected);
     if (selectedEpisodes.length === 0) {
       alert('エピソードを選択してください');
@@ -116,11 +114,9 @@ const KakuyomuDownloader = () => {
     }
 
     setDownloading(true);
-    console.log('選択されたエピソード:', selectedEpisodes);
-
-    // ローカルで状態を管理
     const updatedStatus = { ...downloadStatus };
     const downloadedEpisodes = [];
+    let lastRequestTime = null;
 
     try {
       const total = selectedEpisodes.length;
@@ -128,30 +124,40 @@ const KakuyomuDownloader = () => {
         const episode = selectedEpisodes[i];
         setCurrentProgress(`${i + 1}/${total} 取得中...`);
 
-        console.log(`\n--- エピソード取得開始 (${i + 1}/${total}): ${episode.title} ---`);
-
-        // UI更新用の一時的なステータス
         updatedStatus[episode.id] = { status: 'downloading', error: null };
         setDownloadStatus({ ...updatedStatus });
 
         try {
+          if (!episode.url) {
+            throw new Error('エピソードURLが見つかりません');
+          }
+
+          // 前回の実際のリクエストからの待機時間を計算
+          const waitTime = getWaitTime(lastRequestTime);
+          if (waitTime > 0) {
+            await sleep(waitTime);
+          }
+
           const data = await fetchEpisodeWithRetry(episode.url);
+
+          // キャッシュミスの場合のみ、最後のリクエスト時刻を更新
+          if (!data.fromCache) {
+            lastRequestTime = Date.now();
+          }
 
           console.log('取得成功:', {
             url: episode.url,
             originalTitle: episode.title,
             fetchedTitle: data.title,
             contentLength: data.content.length,
-            content: data.content.substring(0, 200) + '...'
+            fromCache: data.fromCache
           });
 
-          // ローカルステータス更新
           updatedStatus[episode.id] = {
             status: 'completed',
             error: null,
-            title: data.title,
-            content: data.content
           };
+
           downloadedEpisodes.push({
             ...episode,
             ...data
@@ -161,43 +167,38 @@ const KakuyomuDownloader = () => {
           console.error(`エピソード取得エラー (${episode.title}):`, error);
           updatedStatus[episode.id] = {
             status: 'error',
-            error: `${error.message} (${RETRY_COUNT}回リトライ後)`
+            error: `${error.message} (${Constants.RETRY_COUNT}回リトライ後)`
           };
         }
 
-        // UI更新
         setDownloadStatus({ ...updatedStatus });
+      }
 
-        if (i < selectedEpisodes.length - 1) {
-          await sleep(REQUEST_INTERVAL);
-        }
+      if (downloadedEpisodes.length === 0) {
+        throw new Error('ダウンロードに成功したエピソードがありません');
+      }
+
+      setCurrentProgress('EPUB生成中...');
+      setGenerating(true);
+
+      const result = await generateEpub(
+        workTitle,
+        downloadedEpisodes
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'EPUBの生成に失敗しました');
       }
 
       setCurrentProgress('');
-
-      // 最終結果のログ出力
-      console.log('\n=== 取得結果サマリー ===');
-      console.log('ダウンロード状態:', updatedStatus);
-      const completedCount = Object.values(updatedStatus).filter(s => s.status === 'completed').length;
-      console.log('取得したエピソード数:', completedCount);
-      const failedEpisodes = Object.entries(updatedStatus)
-        .filter(([_, s]) => s.status === 'error')
-        .map(([id, s]) => ({
-          id,
-          error: s.error
-        }));
-      console.log('エラーのあったエピソード:', failedEpisodes);
-      console.log('取得した本文データ:', downloadedEpisodes);
-
-      if (failedEpisodes.length > 0) {
-        throw new Error('一部のエピソードの取得に失敗しました');
-      }
+      alert('EPUBの生成が完了しました！');
 
     } catch (error) {
       console.error('全体エラー:', error);
       alert(error.message || 'EPUBの生成に失敗しました');
     } finally {
       setDownloading(false);
+      setGenerating(false);
       setCurrentProgress('');
     }
   };
@@ -218,11 +219,20 @@ const KakuyomuDownloader = () => {
               className="flex-1"
             />
             <Button
-              onClick={fetchEpisodes}
+              onClick={handleFetchEpisodes}
               disabled={!url || loading}
             >
               {loading ? '取得中...' : '取得'}
             </Button>
+            {workTitle && (
+              <Button
+                onClick={handleClearCache}
+                variant="outline"
+                disabled={clearing || downloading || generating}
+              >
+                {clearing ? 'クリア中...' : 'キャッシュクリア'}
+              </Button>
+            )}
           </div>
 
           {episodes.length > 0 && (
@@ -258,10 +268,10 @@ const KakuyomuDownloader = () => {
                     </span>
                   )}
                   <Button
-                    onClick={downloadEpub}
-                    disabled={downloading || !episodes.some(ep => ep.selected)}
+                    onClick={handleDownload}
+                    disabled={downloading || generating || !episodes.some(ep => ep.selected)}
                   >
-                    {downloading ? '取得中...' : 'EPUBをダウンロード'}
+                    {downloading ? '取得中...' : generating ? 'EPUB生成中...' : 'EPUBをダウンロード'}
                   </Button>
                 </div>
               </div>
