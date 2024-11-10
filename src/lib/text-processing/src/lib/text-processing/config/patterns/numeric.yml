@@ -1,0 +1,51 @@
+patterns:
+  - name: threeOrMoreDigits
+    description: 3桁以上の数字を漢数字に変換
+    priority: 3
+    pattern:
+      source: "([0-9０-９][0-9０-９,，、]*[0-9０-９])"
+      lookbehind: "(?<![0-9０-９])"
+      lookahead: "(?![0-9０-９])"
+    transform:
+      type: text
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: halfwidth
+        - action: splitBy
+          separator: [",", "，", "、"]
+        - action: convertEach
+          rules:
+            - type: toKanji
+        - action: join
+          with: "、"
+
+  - name: twoDigits
+    description: 2桁の数字を縦中横に変換
+    priority: 3
+    pattern:
+      source: "([0-9０-９]{2})"
+      lookbehind: "(?<![0-9０-９])"
+      lookahead: "(?![0-9０-９])"
+    transform:
+      type: tcy
+      ensureSpace:
+        after: false
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: halfwidth
+
+  - name: singleDigit
+    description: 1桁の数字を全角に変換
+    priority: 3
+    pattern:
+      source: "([0-9０-９])"
+      lookbehind: "(?<![0-9０-９])"
+      lookahead: "(?![0-9０-９])"
+    transform:
+      type: text
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: fullwidth

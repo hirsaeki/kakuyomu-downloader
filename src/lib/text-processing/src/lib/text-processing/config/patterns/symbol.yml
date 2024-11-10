@@ -1,0 +1,52 @@
+patterns:
+  - name: doubleExclamationQuestion
+    description: 2連続の感嘆符・疑問符を縦中横に変換
+    priority: 4
+    pattern:
+      source: "([!?！？]{2})"
+      lookbehind: "(?<![!?！？])"
+      lookahead: "(?![!?！？])"
+    transform:
+      type: tcy
+      ensureSpace:
+        after: true # 明示的に後続空白を指定
+      steps:
+        - action: convertWidth
+          target: symbols
+          direction: halfwidth
+
+  - name: multipleDots
+    description: 連続中黒を三点リーダーに変換
+    priority: 4
+    pattern:
+      source: "[・]{3,}"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "[・]+"
+          to: "……"
+
+  - name: multipleDots
+    description: 三点リーダーの正規化(常に2連)
+    priority: 4
+    pattern:
+      source: "[…]+"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "[…]+"
+          to: "……"
+
+  - name: basicSymbols
+    description: 基本的な記号を全角に変換
+    priority: 4
+    pattern:
+      source: "[#$%&*+\\-/=@\\\\^_`{|}~:;<>()\\[\\]]"
+    transform:
+      type: text
+      steps:
+        - action: convertWidth
+          target: symbols
+          direction: fullwidth

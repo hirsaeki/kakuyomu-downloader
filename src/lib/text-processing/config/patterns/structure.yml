@@ -1,0 +1,49 @@
+patterns:
+  - name: doubleQuotes
+    description: 二重引用符をカギカッコに変換
+    priority: 1
+    pattern:
+      source: '"([^"]+)"'
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: '"([^"]+)"'
+          to: "「$1」"
+
+  - name: singleQuotes
+    description: 一重引用符を二重カギカッコに変換
+    priority: 1
+    pattern:
+      source: "'([^']+)'"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "'([^']+)'"
+          to: "『$1』"
+
+  - name: removePeriodsBeforeQuotes
+    description: カギカッコ直前の句点を削除
+    priority: 1
+    pattern:
+      source: "。[」』]"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "。([」』])"
+          to: "$1"
+
+  - name: spaceBeforeQuotes
+    description: 行頭カギカッコの前に二分アキを挿入
+    priority: 1
+    pattern:
+      source: "^([「『])"
+      flags: "gm"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "^([「『])"
+          to: "　$1"
