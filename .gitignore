@@ -1,8 +1,53 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build outputs
 dist/
-packages/
+dist-ssr/
+build/
+*.local
+.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+coverage/
+__snapshots__/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Cache
+.eslintcache
+.stylelintcache
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# archive and others
 /*.zip
-/*.xml
 /*_xml.txt
+/*.keep
 /*.xpi
 /main_key.asc
