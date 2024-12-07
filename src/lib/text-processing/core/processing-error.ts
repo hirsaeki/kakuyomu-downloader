@@ -1,25 +1,10 @@
-interface ErrorOptions {
-  patternName?: string;
-  position?: number;
-  input?: string;
-  cause?: Error;
-}
+import { NovelDownloaderError } from '@/types';
 
-export class TextProcessingError extends Error {
-  readonly patternName: string | null;
-  readonly position: number | null;
-
-  constructor(message: string, options: ErrorOptions = {}) {
-    super(message);
+export class TextProcessingError extends NovelDownloaderError {
+  constructor(message: string) {
+    super(message, false, 'general');
     this.name = 'TextProcessingError';
-    this.patternName = options.patternName ?? null;
-    this.position = options.position ?? null;
   }
 }
 
-export class ValidationError extends TextProcessingError {
-  constructor(message: string, options: ErrorOptions = {}) {
-    super(message, { ...options, patternName: 'validation' });
-    this.name = 'ValidationError';
-  }
-}
+export { ValidationError } from '@/types';

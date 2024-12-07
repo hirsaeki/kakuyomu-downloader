@@ -1,7 +1,8 @@
+description: 数値関連のパターン
+basePriority: 500
 patterns:
   - name: threeOrMoreDigits
     description: 3桁以上の数字を漢数字に変換
-    priority: 3
     pattern:
       source: "([0-9０-９][0-9０-９,，、]*[0-9０-９])"
       lookbehind: "(?<![0-9０-９])"
@@ -22,13 +23,14 @@ patterns:
 
   - name: twoDigits
     description: 2桁の数字を縦中横に変換
-    priority: 3
     pattern:
       source: "([0-9０-９]{2})"
       lookbehind: "(?<![0-9０-９])"
       lookahead: "(?![0-9０-９])"
     transform:
       type: tcy
+      ensureSpace:
+        after: false
       steps:
         - action: convertWidth
           target: numbers
@@ -36,7 +38,6 @@ patterns:
 
   - name: singleDigit
     description: 1桁の数字を全角に変換
-    priority: 3
     pattern:
       source: "([0-9０-９])"
       lookbehind: "(?<![0-9０-９])"
