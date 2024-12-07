@@ -1,0 +1,80 @@
+description: 複合的なパターン（日付、分数など）
+basePriority: 200
+patterns:
+  - name: dateFormat
+    description: 日付を漢数字に変換
+    pattern:
+      source: "([0-9０-９]{4})年([0-9０-９]{1,2})月([0-9０-９]{1,2})日"
+    transform:
+      type: text
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: halfwidth
+        - action: convertGroups
+          rules:
+            - group: 1
+              type: toKanji
+            - group: 2
+              type: toKanji
+            - group: 3
+              type: toKanji
+        - action: join
+          template: "{1}年{2}月{3}日"
+
+  - name: fractionFormat
+    description: 分数を漢数字に変換
+    pattern:
+      source: "([0-9０-９]+)[/／]([0-9０-９]+)"
+    transform:
+      type: text
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: halfwidth
+        - action: convertGroups
+          rules:
+            - group: 1
+              type: toKanji
+            - group: 2
+              type: toKanji
+        - action: join
+          template: "{2}分の{1}"
+
+  - name: decimalFormat
+    description: 小数を漢数字と中黒に変換
+    pattern:
+      source: "([0-9０-９]+)[.・．]([0-9０-９]+)"
+    transform:
+      type: text
+      ensureSpace:
+        after: true
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: halfwidth
+        - action: convertGroups
+          rules:
+            - group: 1
+              type: toKanji
+            - group: 2
+              type: toKanji
+        - action: join
+          template: "{1}・{2}"
+
+  - name: eraFormat
+    description: 元号年を漢数字に変換
+    pattern:
+      source: "(明治|大正|昭和|平成|令和)([0-9０-９]{1,2})年"
+    transform:
+      type: text
+      steps:
+        - action: convertWidth
+          target: numbers
+          direction: halfwidth
+        - action: convertGroups
+          rules:
+            - group: 2
+              type: toKanji
+        - action: join
+          template: "{1}{2}年"
