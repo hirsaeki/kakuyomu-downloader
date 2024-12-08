@@ -1,6 +1,7 @@
 import { TypographyDOMOperator } from '../dom';
 import { TransformExecutor } from '../transform/transform-executor';
 import type { GeneratedPattern } from '../config/generated/patterns';
+import type { ProcessedRange } from '../transform/base/types';
 import { NovelDownloaderError, ValidationError } from '@/types';
 import { TEXT_PROCESSING_CONFIG } from '@/config/constants';
 import DOMPurify from 'dompurify';
@@ -120,22 +121,93 @@ export class TypographyProcessor {
   private async processTextContent(node: Node): Promise<void> {
     if (!node.textContent || !node.parentNode) return;
 
-    try {
-      for (const executor of this.transformExecutors.values()) {
-        const result = await executor.execute({ text: node.textContent });
-        // 変換結果を適用
-        if (result.type === 'text') {
-          node.textContent = result.content;
-        } else {
-          // 'tcy'などの特殊な変換結果の場合
-          const element = this.domOperator.createTcyElement(result.content);
-          node.parentNode.replaceChild(element, node);
-          break; // 特殊変換が適用されたら終了
+    const text = node.textContent;
+    let currentPosition = 0;
+    const processedRanges: ProcessedRange[] = [];
+    const fragments: Node[] = [];
+    let lastProcessedPosition = 0;
+
+    while (currentPosition < text.length) {
+      // 重複範囲のチェック
+      const overlappingRange = this.findOverlappingRange(currentPosition, processedRanges);
+      if (overlappingRange) {
+        // 未処理部分があれば通常のテキストとして追加
+        if (lastProcessedPosition < overlappingRange.start) {
+          fragments.push(
+            this.domOperator.createTextNode(
+              text.substring(lastProcessedPosition, overlappingRange.start)
+            )
+          );
+        }
+        currentPosition = overlappingRange.end;
+        lastProcessedPosition = currentPosition;
+        continue;
+      }
+
+      // パターンマッチングと変換処理
+      let processed = false;
+      for (const [patternName, executor] of this.transformExecutors.entries()) {
+        try {
+          const result = await executor.execute({
+            text: text.slice(currentPosition),
+            processedRanges
+          });
+
+          if (result) {
+            // 未処理部分があれば通常のテキストとして追加
+            if (currentPosition > lastProcessedPosition) {
+              fragments.push(
+                this.domOperator.createTextNode(
+                  text.substring(lastProcessedPosition, currentPosition)
+                )
+              );
+            }
+
+            // 変換結果を追加
+            if (result.type === 'text') {
+              fragments.push(this.domOperator.createTextNode(result.content));
+            } else {
+              fragments.push(this.domOperator.createTcyElement(result.content));
+            }
+
+            // 処理範囲を記録
+            const matchLength = result.content.length;
+            processedRanges.push({
+              start: currentPosition,
+              end: currentPosition + matchLength,
+              pattern: patternName
+            });
+
+            currentPosition += matchLength;
+            lastProcessedPosition = currentPosition;
+            processed = true;
+            break;
+          }
+        } catch (error) {
+          typographyLogger.error(`Pattern ${patternName} processing failed:`, error);
         }
       }
-    } catch (error) {
-      typographyLogger.error('Text processing failed:', error);
-      // エラー時は元のテキストを保持
+
+      if (!processed) {
+        currentPosition++;
+      }
+    }
+
+    // 残りの未処理部分を追加
+    if (lastProcessedPosition < text.length) {
+      fragments.push(
+        this.domOperator.createTextNode(
+          text.substring(lastProcessedPosition)
+        )
+      );
+    }
+
+    // 結果をDOMに反映
+    if (fragments.length > 0) {
+      fragments.forEach(fragment => {
+        node.parentNode!.insertBefore(fragment, node);
+      });
+      node.parentNode.removeChild(node);
     }
   }
 
@@ -161,6 +233,15 @@ export class TypographyProcessor {
         element.insertBefore(spaceNode, element.firstChild);
       }
     }
+  }
+
+  /**
+   * 指定位置が処理済み範囲と重複しているかチェック
+   */
+  private findOverlappingRange(position: number, ranges: ProcessedRange[]): ProcessedRange | null {
+    return ranges.find(range =>
+      position >= range.start && position < range.end
+    ) || null;
   }
 
   /**

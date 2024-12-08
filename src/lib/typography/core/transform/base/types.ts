@@ -1,4 +1,3 @@
-
 /**
  * 変換処理のアクションタイプ
  */
@@ -55,21 +54,22 @@ export interface TransformStep {
 }
 
 /**
- * 変換処理のコンテキスト
- */
-export interface TransformContext {
-  text: string;
-  match?: RegExpExecArray;
-  reprocess?: (text: string) => Promise<Node[]>;
-}
-
-/**
  * 処理済み範囲の情報
  */
 export interface ProcessedRange {
   start: number;
   end: number;
   pattern: string;
+}
+
+/**
+ * 変換処理のコンテキスト
+ */
+export interface TransformContext {
+  text: string;
+  match?: RegExpExecArray;
+  processedRanges: ProcessedRange[];  // 重複処理防止用
+  reprocess?: (text: string) => Promise<Node[]>;
 }
 
 /**
