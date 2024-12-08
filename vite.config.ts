@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { yamlPatternTransformerPlugin } from './src/lib/text-processing/config/yaml-pattern-transformer-plugin';
+import { yamlPatternTransformerPlugin } from './src/vite-plugins/yaml-to-patterns';
 
 export default defineConfig({
   plugins: [

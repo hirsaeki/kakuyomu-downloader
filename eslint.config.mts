@@ -8,7 +8,6 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 export default tseslint.config(
   // ベース設定
   {
-    // プロジェクト全体のファイル指定
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
@@ -18,6 +17,8 @@ export default tseslint.config(
       '.idea/**',
       '**/*.min.js',
       'src/components/ui/**',
+      // 生成ファイルを無視
+      '**/generated/**',
     ],
   },
 
@@ -95,6 +96,14 @@ export default tseslint.config(
     files: ['server/**/*.{ts,tsx,mts}'],
     rules: {
       'no-console': 'off', // サーバーではconsole.logを許可
+    },
+  },
+
+  // Viteプラグイン用の設定
+  {
+    files: ['src/vite-plugins/**/*.{ts,mts}'],
+    rules: {
+      'no-console': 'off', // ビルド時のログ出力を許可
     },
   },
 
