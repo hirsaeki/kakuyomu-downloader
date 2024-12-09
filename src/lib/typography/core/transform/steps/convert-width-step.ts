@@ -37,11 +37,12 @@ export class ConvertWidthStep extends BaseTransformStep {
         return /[0-9０-９]/.test(text);
       case 'alphabet':
         return /[a-zA-Zａ-ｚＡ-Ｚ]/.test(text);
-      case 'symbols':
+      case 'symbols': {
         const symbols = this.direction === 'fullwidth' ? 
           Object.keys(ConvertWidthStep.SYMBOL_MAP) :
           Object.keys(ConvertWidthStep.REVERSE_SYMBOL_MAP);
         return symbols.some(s => text.includes(s));
+      }
       default:
         return false;
     }

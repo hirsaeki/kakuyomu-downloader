@@ -1,5 +1,6 @@
 import type { TransformStep } from './base/transform-step';
 import type { TransformContext, TransformResult } from './base/types';
+// @ts-expect-error Viteプラグインで作成されるtsファイル
 import type { GeneratedPattern } from '../config/generated/patterns';
 import { TransformError } from './base/types';
 import { StepFactory } from './factory/step-factory';

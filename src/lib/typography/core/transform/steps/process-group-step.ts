@@ -2,6 +2,11 @@ import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, TransformResult } from '../base/types';
 import { TransformError } from '../base/types';
 
+interface ProcessGroupContext extends TransformContext {
+  match: RegExpExecArray;
+  reprocess: (text: string) => Promise<Node[]>;
+}
+
 export class ProcessGroupStep extends BaseTransformStep {
   constructor(private group: number) {
     super();
@@ -10,13 +15,13 @@ export class ProcessGroupStep extends BaseTransformStep {
     }
   }
 
-  override isApplicable({ match, reprocess }: TransformContext): boolean {
-    if (!super.isApplicable({ text: match?.[this.group] ?? '' })) return false;
+  override isApplicable(context: TransformContext): context is ProcessGroupContext {
+    if (!super.isApplicable({ text: context.match?.[this.group] ?? '' })) return false;
     // マッチ情報とグループ内容、再処理関数の存在を確認
-    return match !== undefined && 
-           this.group < match.length && 
-           match[this.group] !== undefined &&
-           reprocess !== undefined;
+    return context.match !== undefined && 
+           this.group < context.match.length && 
+           context.match[this.group] !== undefined &&
+           context.reprocess !== undefined;
   }
 
   async execute(context: TransformContext): Promise<TransformResult> {
@@ -24,12 +29,12 @@ export class ProcessGroupStep extends BaseTransformStep {
       throw new TransformError('Invalid context for ProcessGroupStep');
     }
 
-    const { match, reprocess } = context;
     // ここではmatch, reprocessの存在は保証されている
-    const groupContent = match![this.group];
+    const { match, reprocess } = context;
+    const groupContent = match[this.group];
 
     try {
-      const processed = await reprocess!(groupContent);
+      const processed = await reprocess(groupContent);
       if (processed.length === 0) {
         return this.createResult(groupContent);
       }

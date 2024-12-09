@@ -1,6 +1,7 @@
-import { TransformError } from '../base/types';
+import { ConversionRule, TransformError } from '../base/types';
 import type { TransformStep } from '../base/transform-step';
-import type { GeneratedPattern, TransformConfig } from '../../config/generated/patterns';
+// @ts-expect-error Viteプラグインで作成されるtsファイル
+import type { GeneratedPattern, TransformConfig, TransformStep as TransformStepConfig } from '../../config/generated/patterns';
 import { 
   ConvertGroupsStep,
   ConvertKanjiStep, 
@@ -26,8 +27,8 @@ export class StepFactory {
     }
 
     return pattern.transform.steps
-      .map(step => this.createStep(step))
-      .filter((step): step is TransformStep => step !== null);
+      .map((step: TransformStepConfig) => this.createStep(step))
+      .filter((step: unknown): step is TransformStep => step !== null);
   }
 
   /**
@@ -77,7 +78,7 @@ export class StepFactory {
             throw new TransformError('Missing rules or group for convertGroups');
           }
           return new ConvertGroupsStep(
-            config.rules.map(rule => ({ group: config.group!, rule }))
+            config.rules.map((rule: ConversionRule) => ({ group: config.group, rule }))
           );
 
         case 'join':

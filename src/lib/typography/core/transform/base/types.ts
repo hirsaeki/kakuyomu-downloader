@@ -68,7 +68,7 @@ export interface ProcessedRange {
 export interface TransformContext {
   text: string;
   match?: RegExpExecArray;
-  processedRanges: ProcessedRange[];  // 重複処理防止用
+  processedRanges?: ProcessedRange[];  // 重複処理防止用
   reprocess?: (text: string) => Promise<Node[]>;
 }
 

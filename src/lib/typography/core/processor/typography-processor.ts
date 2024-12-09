@@ -1,5 +1,6 @@
 import { TypographyDOMOperator } from '../dom';
 import { TransformExecutor } from '../transform/transform-executor';
+// @ts-expect-error Viteプラグインで作成されるtsファイル
 import type { GeneratedPattern } from '../config/generated/patterns';
 import type { ProcessedRange } from '../transform/base/types';
 import { NovelDownloaderError, ValidationError } from '@/types';
@@ -119,7 +120,9 @@ export class TypographyProcessor {
    * テキストコンテンツを処理
    */
   private async processTextContent(node: Node): Promise<void> {
-    if (!node.textContent || !node.parentNode) return;
+    if (!node.textContent) return;
+      const parentNode = node.parentNode;
+    if (!parentNode) return;
 
     const text = node.textContent;
     let currentPosition = 0;
@@ -205,7 +208,7 @@ export class TypographyProcessor {
     // 結果をDOMに反映
     if (fragments.length > 0) {
       fragments.forEach(fragment => {
-        node.parentNode!.insertBefore(fragment, node);
+        parentNode.insertBefore(fragment, node);
       });
       node.parentNode.removeChild(node);
     }

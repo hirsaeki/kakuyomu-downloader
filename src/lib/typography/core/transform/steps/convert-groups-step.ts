@@ -44,10 +44,13 @@ export class ConvertGroupsStep extends BaseTransformStep {
     }
 
     const { match } = context;
+    if (!match) {
+      throw new TransformError('Invalid context: match is required');
+    }
     try {
       const convertedGroups = await Promise.all(
         this.rules.map(async ({ group, rule }) => {
-          const groupContent = match![group];
+          const groupContent = match[group];
           return this.applyRule(groupContent, rule);
         })
       );
@@ -71,13 +74,15 @@ export class ConvertGroupsStep extends BaseTransformStep {
   ): Promise<string | null> {
     try {
       switch (rule.type) {
-        case 'toKanji':
+        case 'toKanji': {
           const kanjiResult = await this.kanjiConverter.execute({ text: content });
           return kanjiResult.content;
+        }
 
-        case 'toFullwidth':
+        case 'toFullwidth': {
           const widthResult = await this.widthConverter.execute({ text: content });
           return widthResult.content;
+        }
 
         default:
           throw new TransformError(`Unknown rule type: ${rule.type}`);
