@@ -1,4 +1,5 @@
-import { ConversionRule, TransformError } from '../base/types';
+import { ConversionRule } from '../base/types';
+import { TransformError } from '@/lib/errors';
 import type { TransformStep } from '../base/transform-step';
 // @ts-expect-error Viteプラグインで作成されるtsファイル
 import type { GeneratedPattern, TransformConfig, TransformStep as TransformStepConfig } from '../../config/generated/patterns';

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import NovelDownloader from './components/NovelDownloader';
-import LoggerControls from './components/LoggerControls';
+import NovelDownloader from '@/components/novel-downloader';
+import LoggerControls from '@/components/logger-control';
 import { adapterRegistry } from './adapters/factory';
 import { KakuyomuAdapterFactory } from './adapters/kakuyomu/factory';
 

@@ -1,6 +1,6 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, TransformResult } from '../base/types';
-import { TransformError } from '../base/types';
+import { TransformError } from '@/lib/errors';
 
 interface ProcessGroupContext extends TransformContext {
   match: RegExpExecArray;
@@ -24,17 +24,16 @@ export class ProcessGroupStep extends BaseTransformStep {
            context.reprocess !== undefined;
   }
 
-  async execute(context: TransformContext): Promise<TransformResult> {
-    if (!this.isApplicable(context)) {
+  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+    if (!this.isApplicable(context)) {  // このチェックは型ガードとしても機能する
       throw new TransformError('Invalid context for ProcessGroupStep');
     }
 
-    // ここではmatch, reprocessの存在は保証されている
-    const { match, reprocess } = context;
-    const groupContent = match[this.group];
+    // この時点でcontextはProcessGroupContextとして扱える
+    const groupContent = context.match[this.group];
 
     try {
-      const processed = await reprocess(groupContent);
+      const processed = await context.reprocess(groupContent);
       if (processed.length === 0) {
         return this.createResult(groupContent);
       }

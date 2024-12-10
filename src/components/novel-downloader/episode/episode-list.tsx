@@ -1,5 +1,5 @@
 import React from 'react';
-import { EpisodeItem } from './EpisodeItem';
+import { EpisodeItem } from './episode-item';
 import type { Episode, EpisodeStatus } from '@/types';
 
 interface EpisodeListProps {

@@ -4,7 +4,7 @@ import type {
   TransformResult,
   ConversionRule
 } from '../base/types';
-import { TransformError } from '../base/types';
+import { TransformError } from '@/lib/errors';
 import { ConvertKanjiStep } from './convert-kanji-step';
 import { ConvertWidthStep } from './convert-width-step';
 
@@ -23,13 +23,13 @@ export class ConvertGroupsStep extends BaseTransformStep {
     this.widthConverter = new ConvertWidthStep('fullwidth', 'numbers');
   }
 
-  override isApplicable({ text, match }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
-    if (!match) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
+    if (!context.match) return false;
 
     // 全てのグループと対応するルールが適用可能かチェック
     return this.rules.every(({ group, rule }) => {
-      const content = match[group];
+      const content = context.match?.[group];
       if (content === undefined) return false;
       
       return rule.type === 'toKanji' ? 
@@ -38,19 +38,15 @@ export class ConvertGroupsStep extends BaseTransformStep {
     });
   }
 
-  async execute(context: TransformContext): Promise<TransformResult> {
-    if (!this.isApplicable(context)) {
-      throw new TransformError('Invalid context for ConvertGroupsStep');
-    }
-
-    const { match } = context;
-    if (!match) {
+  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+    if (!context.match) {
       throw new TransformError('Invalid context: match is required');
     }
+
     try {
       const convertedGroups = await Promise.all(
         this.rules.map(async ({ group, rule }) => {
-          const groupContent = match[group];
+          const groupContent = context.match![group];
           return this.applyRule(groupContent, rule);
         })
       );

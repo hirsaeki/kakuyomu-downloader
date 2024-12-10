@@ -54,6 +54,16 @@ export interface TransformStep {
 }
 
 /**
+ * パターン設定の型定義
+ */
+export interface PatternConfig {
+  pattern: string;  // 正規表現パターン
+  transform: TransformStep[];  // 変換ステップの配列
+  priority?: number;  // 優先度（オプション）
+  description?: string;  // パターンの説明（オプション）
+}
+
+/**
  * 処理済み範囲の情報
  */
 export interface ProcessedRange {
@@ -78,14 +88,4 @@ export interface TransformContext {
 export interface TransformResult {
   type: 'text' | 'tcy';
   content: string;
-}
-
-/**
- * 変換処理のエラー
- */
-export class TransformError extends Error {
-  constructor(message: string) {
-    super(`Transform Error: ${message}`);
-    this.name = 'TransformError';
-  }
 }

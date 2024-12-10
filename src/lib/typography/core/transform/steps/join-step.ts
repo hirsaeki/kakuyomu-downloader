@@ -1,6 +1,6 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, TransformResult } from '../base/types';
-import { TransformError } from '../base/types';
+import { TransformError } from '@/lib/errors';
 
 export class JoinStep extends BaseTransformStep {
   constructor(
@@ -10,11 +10,11 @@ export class JoinStep extends BaseTransformStep {
     super();
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
     try {
       // JSON配列としてパース可能かチェック
-      const parts = JSON.parse(text);
+      const parts = JSON.parse(context.text);
       return Array.isArray(parts) && parts.every(p => typeof p === 'string');
     } catch {
       // テンプレートモードの場合は単一文字列も許容
@@ -22,20 +22,16 @@ export class JoinStep extends BaseTransformStep {
     }
   }
 
-  async execute({ text }: TransformContext): Promise<TransformResult> {
-    if (!this.isApplicable({ text })) {
-      throw new TransformError('Invalid text content for JoinStep');
-    }
-
+  protected async processTransform(context: TransformContext): Promise<TransformResult> {
     try {
       let parts: string[];
       try {
-        parts = JSON.parse(text);
+        parts = JSON.parse(context.text);
         if (!Array.isArray(parts)) {
-          parts = [text];
+          parts = [context.text];
         }
       } catch {
-        parts = [text];
+        parts = [context.text];
       }
 
       let result: string;

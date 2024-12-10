@@ -1,6 +1,6 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, TransformResult } from '../base/types';
-import { TransformError } from '../base/types';
+import { TransformError } from '@/lib/errors';
 
 export class SplitByStep extends BaseTransformStep {
   private readonly separators: string[];
@@ -10,18 +10,14 @@ export class SplitByStep extends BaseTransformStep {
     this.separators = Array.isArray(separator) ? separator : [separator];
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
-    return this.separators.some(sep => text.includes(sep));  // 区切り文字の存在確認
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
+    return this.separators.some(sep => context.text.includes(sep));  // 区切り文字の存在確認
   }
 
-  async execute({ text }: TransformContext): Promise<TransformResult> {
-    if (!this.isApplicable({ text })) {
-      throw new TransformError('Invalid text content for SplitByStep');
-    }
-
+  protected async processTransform(context: TransformContext): Promise<TransformResult> {
     try {
-      let parts: string[] = [text];
+      let parts: string[] = [context.text];
       
       this.separators.forEach(sep => {
         parts = parts.flatMap(part => 

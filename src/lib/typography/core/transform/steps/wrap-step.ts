@@ -1,6 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, TransformResult } from '../base/types';
-import { TransformError } from '../base/types';
 
 export class WrapStep extends BaseTransformStep {
   constructor(
@@ -10,16 +9,8 @@ export class WrapStep extends BaseTransformStep {
     super();
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    return super.isApplicable({ text });  // 基本的な文字列チェックで十分
-  }
-
-  async execute({ text }: TransformContext): Promise<TransformResult> {
-    if (!this.isApplicable({ text })) {
-      throw new TransformError('Invalid text content for WrapStep');
-    }
-
-    return this.createResult(`${this.prefix}${text}${this.suffix}`);
+  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+    return this.createResult(`${this.prefix}${context.text}${this.suffix}`);
   }
 
   toString(): string {

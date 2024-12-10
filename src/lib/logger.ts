@@ -13,8 +13,8 @@ class Logger {
   private static instance: Logger;
   private isDebugMode: boolean;
   private logBuffer: LogEntry[] = [];
-  private readonly MAX_BUFFER_SIZE = 1000;  // バッファサイズ
-  private readonly MAX_STORAGE_SIZE = 10000; // ストレージの最大ログ数
+  private readonly MAX_BUFFER_SIZE = 1000;
+  private readonly MAX_STORAGE_SIZE = 10000;
   private readonly STORAGE_KEY = 'application_logs';
   private readonly AUTO_SAVE_INTERVAL = 5 * 60 * 1000; // 5分
 
@@ -47,7 +47,7 @@ class Logger {
     try {
       const storedLogs = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '[]');
       const updatedLogs = [...storedLogs, ...this.logBuffer]
-        .slice(-this.MAX_STORAGE_SIZE); // 古いログを自動的に削除
+        .slice(-this.MAX_STORAGE_SIZE);
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedLogs));
       this.logBuffer = [];
     } catch (error) {
@@ -58,7 +58,6 @@ class Logger {
   private loadLogsFromStorage(): void {
     try {
       const storedLogs = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '[]');
-      // ストレージサイズを超えた古いログは自動的に削除
       const trimmedLogs = storedLogs.slice(-this.MAX_STORAGE_SIZE);
       if (trimmedLogs.length < storedLogs.length) {
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(trimmedLogs));
@@ -124,62 +123,48 @@ class Logger {
     }
   }
 
+  private log(level: LogLevel, message: string, data?: unknown): void {
+    const entry = this.formatMessage(level, message, data);
+    const shouldConsoleLog = this.isDebugMode || level === 'warn' || level === 'error';
+
+    if (shouldConsoleLog) {
+      const logData = data instanceof Error ? {
+        name: data.name,
+        message: data.message,
+        stack: data.stack
+      } : data;
+
+      const timestamp = entry.timestamp;
+      const upperLevel = level.toUpperCase();
+      // eslint-disable-next-line no-console
+      console[level](`[${timestamp}] ${upperLevel}: ${message}`, logData);
+    }
+
+    this.addToBuffer(entry);
+  }
+
   debug(message: string, data?: unknown): void {
     if (this.isDebugMode) {
-      const entry = this.formatMessage('debug', message, data);
-      // eslint-disable-next-line no-console
-      console.debug(`[${entry.timestamp}] DEBUG: ${message}`, data);
-      this.addToBuffer(entry);
+      this.log('debug', message, data);
     }
   }
 
   info(message: string, data?: unknown): void {
-    const entry = this.formatMessage('info', message, data);
     if (this.isDebugMode) {
-      // eslint-disable-next-line no-console
-      console.info(`[${entry.timestamp}] INFO: ${message}`, data);
-      this.addToBuffer(entry);
+      this.log('info', message, data);
     }
   }
 
   warn(message: string, data?: unknown): void {
-    if (this.isDebugMode) {
-      const entry = this.formatMessage('warn', message, data);
-      console.warn(`[${entry.timestamp}] WARN: ${message}`, data);
-    }
-    this.addToBuffer(entry);
+    this.log('warn', message, data);
   }
 
   error(message: string, error?: Error | unknown): void {
-    const errorData = error instanceof Error ? {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    } : error;
-
-    if (this.isDebugMode) {
-      const entry = this.formatMessage('error', message, errorData);
-      console.error(`[${entry.timestamp}] ERROR: ${message}`, errorData);
-    }
-    this.addToBuffer(entry);
+    this.log('error', message, error);
   }
 
   logWithContext(level: LogLevel, context: string, message: string, data?: unknown): void {
-    const contextMessage = `[${context}] ${message}`;
-    switch (level) {
-      case 'debug':
-        this.debug(contextMessage, data);
-        break;
-      case 'info':
-        this.info(contextMessage, data);
-        break;
-      case 'warn':
-        this.warn(contextMessage, data);
-        break;
-      case 'error':
-        this.error(contextMessage, data);
-        break;
-    }
+    this.log(level, `[${context}] ${message}`, data);
   }
 }
 

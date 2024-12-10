@@ -1,11 +1,19 @@
-export function generateStyles(): string {
+import { EPUB_CONFIG } from '@/config/epub';
+
+/**
+ * デフォルトのスタイルシートを生成します
+ */
+export function generateDefaultStyles(): string {
+  const { STYLES } = EPUB_CONFIG;
+  const { FONT_FAMILIES } = EPUB_CONFIG.DEFAULTS;
+
   return `@charset "UTF-8";
 
 html {
   /* 縦書きの基本設定 */
-  writing-mode: vertical-rl;
-  -webkit-writing-mode: vertical-rl;
-  -epub-writing-mode: vertical-rl;
+  writing-mode: ${STYLES.WRITING_MODE.VERTICAL};
+  -webkit-writing-mode: ${STYLES.WRITING_MODE.VERTICAL};
+  -epub-writing-mode: ${STYLES.WRITING_MODE.VERTICAL};
   -ms-writing-mode: tb-rl;
   
   /* テキストサイズの自動調整を無効化 */
@@ -14,22 +22,22 @@ html {
   -epub-text-size-adjust: 100%;
   
   /* 基本的な余白設定 */
-  margin: 0;
-  padding: 0;
+  margin: ${STYLES.SPACING.MARGIN};
+  padding: ${STYLES.SPACING.PADDING};
   
   /* フォントレンダリングの最適化 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
   /* 基本のフォントサイズ設定 */
-  font-size: 16px;
+  font-size: ${STYLES.TEXT.FONT_SIZE};
 }
 
 body {
   /* 縦書き設定の継承と強制 */
-  writing-mode: vertical-rl;
-  -webkit-writing-mode: vertical-rl;
-  -epub-writing-mode: vertical-rl;
+  writing-mode: ${STYLES.WRITING_MODE.VERTICAL};
+  -webkit-writing-mode: ${STYLES.WRITING_MODE.VERTICAL};
+  -epub-writing-mode: ${STYLES.WRITING_MODE.VERTICAL};
   -ms-writing-mode: tb-rl;
   
   /* 文字の向き */
@@ -38,25 +46,14 @@ body {
   -epub-text-orientation: mixed;
   
   /* 行間設定 */
-  line-height: 1.8;
+  line-height: ${STYLES.TEXT.LINE_HEIGHT};
   
-  /* フォントファミリー（優先順位順） */
-  font-family:
-    "Noto Serif CJK JP",
-    "Noto Serif JP",
-    "Hiragino Mincho ProN",
-    "Hiragino Mincho Pro",
-    "Yu Mincho",
-    "YuMincho",
-    "HG Mincho E",
-    "MS PMincho",
-    "MS Mincho",
-    "Crimson Text",
-    serif;
+  /* フォントファミリー */
+  font-family: ${FONT_FAMILIES.join(', ')};
   
   /* 余白設定 */
-  margin: 0;
-  padding: 2em 2.5em;
+  margin: ${STYLES.SPACING.MARGIN};
+  padding: ${STYLES.SPACING.PADDING};
   
   /* 行分割関連 */
   line-break: strict;
@@ -103,9 +100,9 @@ h1 {
 
 /* 段落設定 */
 p {
-  margin: 0;
+  margin: ${STYLES.SPACING.MARGIN};
   padding: 0;
-  text-indent: 1em;
+  text-indent: ${STYLES.TEXT.INDENT};
   
   /* 段落分割制御 */
   orphans: 2;

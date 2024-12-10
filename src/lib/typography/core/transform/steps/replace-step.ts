@@ -1,6 +1,6 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, TransformResult } from '../base/types';
-import { TransformError } from '../base/types';
+import { TransformError } from '@/lib/errors';
 
 /**
  * テキストの置換を行うステップ
@@ -25,14 +25,10 @@ export class ReplaceStep extends BaseTransformStep {
     }
   }
 
-  async execute({ text }: TransformContext): Promise<TransformResult> {
-    if (!this.isApplicable({ text })) {
-      throw new TransformError('Invalid text content for ReplaceStep');
-    }
-
+  protected async processTransform(context: TransformContext): Promise<TransformResult> {
     try {
       // KISS: シンプルなreplace操作のみ
-      const result = text.replace(this.pattern, this.to);
+      const result = context.text.replace(this.pattern, this.to);
       return this.createResult(result);
     } catch (error) {
       throw new TransformError(

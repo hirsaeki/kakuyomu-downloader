@@ -63,7 +63,6 @@ export class NetworkError extends NovelDownloaderError {
 /**
  * Episode Types
  */
-
 // エピソードの基本情報
 export interface Episode {
   id: string;           // エピソードの一意識別子
@@ -125,33 +124,4 @@ export type DownloadStatus = 'pending' | 'downloading' | 'completed' | 'error';
 export interface EpisodeStatus {
   status: DownloadStatus;
   error: string | null;
-}
-
-/**
- * EPUB Types
- */
-// EPUB生成関連の型定義
-export interface TextProcessorOptions {
-  title: string;        // EPUBのタイトル
-  author: string;       // 作者名
-  publisher: string;    // 出版者名
-  tocTitle: string;     // 目次タイトル
-  lang: string;         // 言語コード
-  content: Array<{      // コンテンツ情報
-    title: string;      // チャプタータイトル
-    data: string;       // チャプターの内容
-    metadata?: {        // メタデータ（オプション）
-      groupTitle?: string;  // グループタイトル
-      date?: string;        // 公開日
-      originalUrl?: string; // 元のURL
-    };
-  }>;
-}
-
-// EPUB生成の結果
-export interface EPUBGeneratorResult {
-  success: boolean;     // 生成成功フラグ
-  error?: string;       // エラーメッセージ
-  blob?: Blob;          // 生成されたEPUBデータ
-  filePath?: string;    // 保存先パス
 }

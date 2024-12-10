@@ -1,1 +1,1 @@
-export { NovelDownloader } from './NovelDownloader';
+export { NovelDownloader as default } from './novel-downloader';

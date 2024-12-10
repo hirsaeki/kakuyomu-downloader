@@ -1,2 +1,2 @@
-export { DownloadControls } from './DownloadControls';
-export { SelectionControls } from './SelectionControls';
+export { DownloadControls } from './download-control';
+export { SelectionControls } from './selection-control';

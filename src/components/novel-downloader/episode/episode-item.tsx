@@ -1,6 +1,6 @@
 import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { StatusIndicator } from './StatusIndicator';
+import { StatusIndicator } from './status-indicator';
 import { getDisplayTitle } from '@/lib/display/utils';
 import type { Episode, EpisodeStatus } from '@/types';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BaseAlert } from './BaseAlert';
+import { BaseAlert } from './base-alert';
 import { XCircle, Loader2, AlertCircle } from 'lucide-react';
 
 export const ErrorAlert: React.FC<{ message: string }> = (props) => (

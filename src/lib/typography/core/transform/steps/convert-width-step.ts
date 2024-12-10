@@ -5,7 +5,7 @@ import type {
   WidthTarget, 
   WidthDirection 
 } from '../base/types';
-import { TransformError } from '../base/types';
+import { TransformError } from '@/lib/errors';
 
 export class ConvertWidthStep extends BaseTransformStep {
   private static readonly SYMBOL_MAP: Record<string, string> = {
@@ -48,7 +48,7 @@ export class ConvertWidthStep extends BaseTransformStep {
     }
   }
 
-  async execute({ text }: TransformContext): Promise<TransformResult> {
+  protected async processTransform({ text }: TransformContext): Promise<TransformResult> {
     if (!this.isApplicable({ text })) {
       throw new TransformError('Invalid text content for ConvertWidthStep');
     }

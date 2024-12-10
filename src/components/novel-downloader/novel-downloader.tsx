@@ -157,3 +157,5 @@ export const NovelDownloader: React.FC = () => {
     </Card>
   );
 };
+
+export default NovelDownloader;
