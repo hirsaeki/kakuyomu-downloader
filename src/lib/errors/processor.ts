@@ -1,4 +1,4 @@
-import { AppError } from './base';
+import { AppError, ErrorCode } from './base';
 
 /**
  * テキスト処理に関するエラー
@@ -7,7 +7,7 @@ import { AppError } from './base';
 export class ProcessorError extends AppError {
   constructor(
     message: string,
-    code: string = 'PROCESSOR_ERROR'
+    code: ErrorCode = 'PROCESSOR_ERROR'
   ) {
     super(message, code);
     Object.setPrototypeOf(this, ProcessorError.prototype);

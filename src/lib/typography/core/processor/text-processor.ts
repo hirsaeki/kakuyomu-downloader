@@ -1,8 +1,7 @@
 import type { PatternConfig, TransformContext } from '../transform/base/types';
-import type { ProcessorError } from '@/lib/errors';
+import { ProcessorError } from '@/lib/errors';
 import { EpubTransformer } from '../transform/epub';
 import EPUB_CONFIG from '@/config/epub';
-import { TEXT_PROCESSING_CONFIG } from '@/config/constants';
 
 export interface TextProcessorOptions {
   /**
@@ -69,8 +68,7 @@ export class TextProcessor {
       return this.wrapInXhtml(result.content, title);
     } catch (error) {
       throw new ProcessorError(
-        `テキスト変換に失敗: ${error instanceof Error ? error.message : '不明なエラー'}`,
-        'TEXT_CONVERSION_ERROR'
+        `テキスト変換に失敗: ${error instanceof Error ? error.message : 'XHTML変換エラー'}`
       );
     }
   }

@@ -1,12 +1,10 @@
 import JSZip from 'jszip';
-import { GenerationError } from '@/lib/errors/generation';
+import { GenerationError } from '@/lib/errors';
 import { generateXmlTemplates } from '../../templates';
 import { generateDefaultStyles } from '../../styles';
 import EPUB_CONFIG from '@/config/epub';
 import type { GeneratedChapter } from './content';
-import type { MetadataOptions } from '../types';
-
-export type EPUBMetadata = Required<Pick<MetadataOptions, 'title' | 'author' | 'publisher' | 'tocTitle' | 'lang' | 'modifiedDate' | 'content'>>;
+import type { EPUBMetadata } from '../types';
 
 export class StructureGenerator {
   /**
@@ -38,7 +36,7 @@ export class StructureGenerator {
   private async createMetaInf(zip: JSZip): Promise<void> {
     const metaInf = zip.folder('META-INF');
     if (!metaInf) {
-      throw new GenerationError('フォルダの作成に失敗しました', 'FOLDER_CREATION_ERROR');
+      throw new GenerationError('フォルダの作成に失敗しました');
     }
 
     const { containerXml } = generateXmlTemplates();
@@ -56,7 +54,7 @@ export class StructureGenerator {
   ): Promise<void> {
     const oebps = zip.folder('OEBPS');
     if (!oebps) {
-      throw new GenerationError('フォルダの作成に失敗しました', 'FOLDER_CREATION_ERROR');
+      throw new GenerationError('フォルダの作成に失敗しました');
     }
 
     // テンプレートの生成

@@ -2,7 +2,7 @@ import { NovelSiteAdapter, EpisodeListResult, EpisodeContentResult } from '../ty
 import { KakuyomuParser } from './parser';
 import { KakuyomuValidator } from './validator';
 import { HttpClient } from '@/lib/http/types';
-import { ValidationError, NetworkError, NovelDownloaderError } from '@/types';
+import { AppError, ValidationError, NetworkError } from '@/lib/errors';
 
 export class KakuyomuAdapter implements NovelSiteAdapter {
   readonly siteName = 'カクヨム';
@@ -20,7 +20,9 @@ export class KakuyomuAdapter implements NovelSiteAdapter {
   async fetchEpisodeList(url: string): Promise<EpisodeListResult> {
     try {
       if (!this.isCompatible(url)) {
-        throw new ValidationError('無効なURLです');
+        throw new ValidationError('無効なURLです', {
+          url: ['カクヨムの作品URLではありません']
+        });
       }
 
       const normalizedUrl = this.normalizeUrl(url);
@@ -34,14 +36,14 @@ export class KakuyomuAdapter implements NovelSiteAdapter {
 
       const content = response.data?.data?.content;
       if (!content) {
-        throw new NovelDownloaderError('コンテンツの取得に失敗しました');
+        throw new NetworkError('コンテンツの取得に失敗しました', true);
       }
 
       // パース処理
       const { workTitle, author, episodes } = KakuyomuParser.parseEpisodeList(content);
 
       if (episodes.length === 0) {
-        throw new NovelDownloaderError('エピソードが見つかりませんでした');
+        throw new AppError('エピソードリストがパースできませんでした', 'GENERAL_ERROR');
       }
 
       return {
@@ -53,16 +55,19 @@ export class KakuyomuAdapter implements NovelSiteAdapter {
       };
 
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof NetworkError || error instanceof NovelDownloaderError) {
+      // エラーレスポンスの生成
+      if (error instanceof AppError) {
+        const response = error.toResponse();
         return {
           success: false,
           workTitle: '',
           author: '',
           episodes: [],
-          error: error.message
+          error: response.error.message
         };
       }
 
+      // 未知のエラー
       return {
         success: false,
         workTitle: '',
@@ -76,7 +81,9 @@ export class KakuyomuAdapter implements NovelSiteAdapter {
   async fetchEpisodeContent(url: string): Promise<EpisodeContentResult> {
     try {
       if (!KakuyomuValidator.isValidEpisodeUrl(url)) {
-        throw new ValidationError('無効なエピソードURLです');
+        throw new ValidationError('無効なエピソードURLです', {
+          url: ['カクヨムのエピソードURLではありません']
+        });
       }
 
       const normalizedUrl = this.normalizeEpisodeUrl(url);
@@ -90,7 +97,7 @@ export class KakuyomuAdapter implements NovelSiteAdapter {
 
       const content = response.data?.data?.content;
       if (!content) {
-        throw new NovelDownloaderError('コンテンツの取得に失敗しました');
+        throw new NetworkError('コンテンツの取得に失敗しました', true);
       }
 
       // パース処理
@@ -104,15 +111,18 @@ export class KakuyomuAdapter implements NovelSiteAdapter {
       };
 
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof NetworkError || error instanceof NovelDownloaderError) {
+      // エラーレスポンスの生成
+      if (error instanceof AppError) {
+        const response = error.toResponse();
         return {
           success: false,
           title: '',
           content: '',
-          error: error.message
+          error: response.error.message
         };
       }
 
+      // 未知のエラー
       return {
         success: false,
         title: '',

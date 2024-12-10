@@ -1,2 +1,1 @@
-export * from './content';
-export * from './structure';
+export { EPUBGenerator } from './epub';

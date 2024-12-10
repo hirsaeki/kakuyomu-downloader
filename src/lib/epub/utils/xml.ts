@@ -1,5 +1,3 @@
-import { EPUB_CONFIG } from '@/config/constants';
-
 /**
  * XMLで使用できない文字をエスケープします
  */

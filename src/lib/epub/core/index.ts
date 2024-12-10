@@ -1,2 +1,2 @@
-export * from './generators';
-export * from './types';
+export { EPUBGenerator } from './generators';
+export type { InputChapter, EPUBMetadata, ContentMetadata } from './types';

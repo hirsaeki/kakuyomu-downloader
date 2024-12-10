@@ -1,20 +1,24 @@
-import Dexie, { Table } from 'dexie';
+import Dexie from 'dexie';
 import { CACHE_CONFIG } from '@/config/constants';
 import {
   Work,
   WorkRecord,
   EpisodeRecord,
   ContentRecord,
-  NovelDownloaderError,
-  ValidationError
+  INovelDatabase,
 } from '@/types';
+import {
+  DatabaseError,
+  ValidationError
+} from '@/lib/errors'
 import { createContextLogger } from '@/lib/logger';
 
 const dbLogger = createContextLogger('database');
-class NovelDatabase extends Dexie {
-  works!: Table<WorkRecord>;
-  episodes!: Table<EpisodeRecord>;
-  contents!: Table<ContentRecord>;
+
+class NovelDatabase extends Dexie implements INovelDatabase {
+  works!: Dexie.Table<WorkRecord>;
+  episodes!: Dexie.Table<EpisodeRecord>;
+  contents!: Dexie.Table<ContentRecord>;
 
   constructor() {
     super(CACHE_CONFIG.DATABASE.NAME);
@@ -39,7 +43,6 @@ class NovelDatabase extends Dexie {
         });
       });
 
-      // Work インターフェースを直接使用して返す
       return {
         url,
         workTitle,
@@ -47,9 +50,8 @@ class NovelDatabase extends Dexie {
         lastAccessed: new Date()
       };
     } catch (error) {
-      // console.error('作品保存エラー:', error);
       dbLogger.error('作品保存エラー:', error);
-      throw new NovelDownloaderError('作品情報の保存に失敗しました');
+      throw new DatabaseError('作品情報の保存に失敗しました');
     }
   }
 
@@ -69,7 +71,6 @@ class NovelDatabase extends Dexie {
           lastModified: now
         }));
 
-        // バッチ処理での保存
         await this.episodes.where('workUrl').equals(workUrl).delete();
         await this.episodes.bulkPut(episodesToSave);
       });
@@ -77,9 +78,8 @@ class NovelDatabase extends Dexie {
       if (error instanceof ValidationError) {
         throw error;
       }
-      // console.error('エピソード保存エラー:', error);
       dbLogger.error('エピソード保存エラー:', error);
-      throw new NovelDownloaderError('エピソード情報の保存に失敗しました');
+      throw new DatabaseError('エピソード情報の保存に失敗しました');
     }
   }
 
@@ -90,13 +90,11 @@ class NovelDatabase extends Dexie {
         const contentHash = await this.calculateContentHash(content);
         const existingContent = await this.contents.get(episodeUrl);
 
-        // コンテンツが同じ場合は最終アクセス日時のみ更新
         if (existingContent && contentHash === await this.calculateContentHash(existingContent.content)) {
           await this.contents.update(episodeUrl, { lastAccessed: now });
           return;
         }
 
-        // 新規保存または更新
         await this.contents.put({
           episodeUrl,
           title,
@@ -106,9 +104,8 @@ class NovelDatabase extends Dexie {
         });
       });
     } catch (error) {
-      // console.error('コンテンツ保存エラー:', error);
       dbLogger.error('コンテンツ保存エラー:', error);
-      throw new NovelDownloaderError('コンテンツの保存に失敗しました');
+      throw new DatabaseError('コンテンツの保存に失敗しました');
     }
   }
 
@@ -120,9 +117,8 @@ class NovelDatabase extends Dexie {
       }
       return work;
     } catch (error) {
-      // console.error('作品取得エラー:', error);
       dbLogger.error('作品取得エラー:', error);
-      throw new NovelDownloaderError('作品情報の取得に失敗しました');
+      throw new DatabaseError('作品情報の取得に失敗しました');
     }
   }
 
@@ -138,7 +134,6 @@ class NovelDatabase extends Dexie {
 
       if (episodes.length > 0) {
         const now = new Date();
-        // バッチ処理での最終アクセス日時更新
         const batchSize = CACHE_CONFIG.CLEANUP.BATCH_SIZE;
         for (let i = 0; i < episodes.length; i += batchSize) {
           const batch = episodes.slice(i, i + batchSize);
@@ -153,9 +148,8 @@ class NovelDatabase extends Dexie {
 
       return episodes;
     } catch (error) {
-      // console.error('エピソード取得エラー:', error);
       dbLogger.error('エピソード取得エラー:', error);
-      throw new NovelDownloaderError('エピソード情報の取得に失敗しました');
+      throw new DatabaseError('エピソード情報の取得に失敗しました');
     }
   }
 
@@ -167,9 +161,8 @@ class NovelDatabase extends Dexie {
       }
       return content;
     } catch (error) {
-      // console.error('コンテンツ取得エラー:', error);
       dbLogger.error('コンテンツ取得エラー:', error);
-      throw new NovelDownloaderError('コンテンツの取得に失敗しました');
+      throw new DatabaseError('コンテンツの取得に失敗しました');
     }
   }
 
@@ -190,9 +183,8 @@ class NovelDatabase extends Dexie {
         ]);
       });
     } catch (error) {
-      // console.error('キャッシュ削除エラー:', error);
       dbLogger.error('キャッシュ削除エラー:', error);
-      throw new NovelDownloaderError('キャッシュのクリアに失敗しました');
+      throw new DatabaseError('キャッシュのクリアに失敗しました');
     }
   }
 
@@ -216,10 +208,8 @@ class NovelDatabase extends Dexie {
 
         const episodeUrls = oldEpisodes.map(e => e.url).filter(Boolean) as string[];
 
-        // キャッシュサイズの確認と管理
         const totalSize = await this.calculateCacheSize();
         if (totalSize > CACHE_CONFIG.MAX_CACHE_SIZE * 1024 * 1024) {
-          // console.info(`キャッシュサイズが上限(${CACHE_CONFIG.MAX_CACHE_SIZE}MB)を超えています`);
           dbLogger.info(`キャッシュサイズが上限(${CACHE_CONFIG.MAX_CACHE_SIZE}MB)を超えています`);
         }
 
@@ -230,9 +220,7 @@ class NovelDatabase extends Dexie {
         ]);
       });
     } catch (error) {
-      // console.error('古いキャッシュの削除エラー:', error);
       dbLogger.error('古いキャッシュの削除エラー:', error);
-      // キャッシュクリーンアップの失敗は致命的エラーとして扱わない
     }
   }
 
@@ -252,7 +240,6 @@ class NovelDatabase extends Dexie {
         return total + new Blob([record.content]).size;
       }, 0);
     } catch (error) {
-      // console.warn('キャッシュサイズの計算エラー:', error);
       dbLogger.warn('キャッシュサイズの計算エラー:', error);
       return 0;
     }
@@ -261,7 +248,6 @@ class NovelDatabase extends Dexie {
 
 const db = new NovelDatabase();
 
-// 起動時の処理
 db.cleanOldCache().catch((error: unknown) => {
   dbLogger.error('キャッシュのクリーンアップに失敗しました', error);
 });

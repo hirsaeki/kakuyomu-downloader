@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useDownload } from './useDownload';
-import { useEpisodes } from './useEpisodes';
-import { useNovelInfo } from './useNovelInfo';
+import { useDownload } from './use-download';
+import { useEpisodes } from './use-episodes';
+import { useNovelInfo } from './use-novel-info';
 import { createContextLogger } from '@/lib/logger';
 
 const hookLogger = createContextLogger('novel-downloader-hook');

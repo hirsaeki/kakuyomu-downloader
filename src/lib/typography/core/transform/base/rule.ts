@@ -1,7 +1,7 @@
 import { TextTransformRule } from '../../processor/types';
 
 export abstract class BaseTransformRule implements TextTransformRule {
-  constructor(protected readonly priority: number = 100) {}
+  constructor(public readonly priority: number = 100) {}
 
   getPriority(): number {
     return this.priority;

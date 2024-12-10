@@ -1,4 +1,4 @@
-import { TextProcessingError } from '@/lib/typography/core/transform/base/types';
+import { GenerationError } from '@/lib/errors';
 
 /**
  * UUID v4を生成します
@@ -16,7 +16,7 @@ export function generateUUID(): string {
       return v.toString(16);
     });
   } catch {
-    throw new TextProcessingError('Failed to generate UUID');
+    throw new GenerationError('Failed to generate UUID');
   }
 }
 

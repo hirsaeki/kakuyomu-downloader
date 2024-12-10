@@ -1,9 +1,10 @@
-import type { OutputChapter, MetadataOptions } from './types';
+import type { OutputChapter } from './types';
+import type { EPUBMetadata } from '../../core/types';
 import { escapeXml } from '../../utils';
 import EPUB_CONFIG from '@/config/epub';
 
 export function generateContentOpf(
-  options: MetadataOptions,
+  options: EPUBMetadata,
   chapters: OutputChapter[],
   uuid: string
 ): string {
@@ -12,10 +13,10 @@ export function generateContentOpf(
     author,
     publisher = '',
     lang,
-    description,
-    rights,
-    published,
-    keywords,
+    description = '',
+    rights = '',
+    published = '',
+    keywords = [],
     series,
     modifiedDate
   } = options;

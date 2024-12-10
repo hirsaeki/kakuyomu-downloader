@@ -3,7 +3,7 @@ import yaml from 'js-yaml';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import type { PatternConfig } from '@/lib/typography/core/transform/base/types';
-import { ValidationError } from '@/types';
+import { ValidationError } from '@/lib/errors';
 import { createContextLogger } from '@/lib/logger';
 
 const patternLogger = createContextLogger('PatternManager');

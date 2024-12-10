@@ -2,20 +2,8 @@ import JSZip from 'jszip';
 import { TextProcessor } from '@/lib/typography/core/processor';
 import { ValidationError } from '@/lib/errors/validation';
 import { GenerationError } from '@/lib/errors/generation';
+import { InputChapter } from '../types';
 import EPUB_CONFIG from '@/config/epub';
-
-/**
- * EPUB生成の入力として使用するチャプター情報
- */
-export interface InputChapter {
-  title: string;
-  data: string;
-  metadata?: {
-    groupTitle?: string;
-    date?: string;
-    originalUrl?: string;
-  };
-}
 
 /**
  * 生成処理の過程で使用する中間チャプター情報
@@ -104,13 +92,11 @@ export class ContentGenerator {
     if (!chapter.title?.trim()) {
       throw new ValidationError(
         `Chapter ${index + 1}: タイトルが設定されていません`,
-        'CHAPTER_TITLE_REQUIRED'
       );
     }
     if (!chapter.data?.trim()) {
       throw new ValidationError(
         `Chapter ${index + 1}: コンテンツが空です`,
-        'CHAPTER_CONTENT_REQUIRED'
       );
     }
   }

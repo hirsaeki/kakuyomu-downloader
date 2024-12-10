@@ -1,1 +1,1 @@
-export { useNovelDownloader } from './useNovelDownloader';
+export { useNovelDownloader } from './use-novel-downloader';

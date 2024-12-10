@@ -30,15 +30,17 @@ export interface NovelSiteAdapter {
 
   /**
    * エピソード一覧を取得
-   * @throws {ValidationError} 非対応のURLの場合
-   * @throws {NovelDownloaderError} 取得失敗時
+   * @throws {ValidationError} 非対応のURLまたはバリデーションエラー発生時
+   * @throws {NetworkError} ネットワーク接続やサーバーエラー発生時
+   * @throws {AppError} その他のエラー（コンテンツ解析エラーなど）
    */
   fetchEpisodeList(url: string): Promise<EpisodeListResult>;
 
   /**
    * エピソードの本文を取得
-   * @throws {ValidationError} 非対応のURLの場合
-   * @throws {NovelDownloaderError} 取得失敗時
+   * @throws {ValidationError} 非対応のURLまたはバリデーションエラー発生時
+   * @throws {NetworkError} ネットワーク接続やサーバーエラー発生時
+   * @throws {AppError} その他のエラー（コンテンツ解析エラーなど）
    */
   fetchEpisodeContent(url: string): Promise<EpisodeContentResult>;
 
@@ -56,7 +58,7 @@ export interface NovelSiteAdapter {
 }
 
 export interface AdapterConfig {
-  httpClient: HttpClient;  // anyの代わりに具体的な型を使用
+  httpClient: HttpClient;
   proxyConfig?: {
     endpoint: string;
     buildUrl: (url: string) => string;
@@ -81,4 +83,45 @@ export interface NovelSiteAdapterFactory {
    * 登録されているアダプターの一覧を取得
    */
   getRegisteredAdapters(): NovelSiteAdapter[];
+}
+/**
+ * パース結果の型定義
+ */
+export interface ParsedEpisodeList {
+  workTitle: string;
+  author: string;
+  episodes: Episode[];
+}
+
+export interface ParsedEpisodeContent {
+  title: string;
+  content: string;
+}
+
+/**
+ * DOM要素の取得結果の型定義
+ */
+export interface ParsedWorkElements {
+  titleElement: Element | null;
+  authorElement: Element | null;
+}
+
+export interface ParsedEpisodeElements {
+  href: string | null;
+  titleElement: Element | undefined;
+  dateElement: HTMLTimeElement | null;
+}
+
+/**
+ * バリデーション済みの要素の型定義
+ */
+export interface ValidWorkElements {
+  titleElement: Element;
+  authorElement: Element;
+}
+
+export interface ValidEpisodeElements {
+  href: string;
+  titleElement: Element;
+  dateElement: HTMLTimeElement;
 }

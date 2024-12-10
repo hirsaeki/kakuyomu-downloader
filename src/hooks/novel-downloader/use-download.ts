@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { NovelSiteAdapter } from '@/adapters/types';
-import { Episode, EpisodeStatus } from '@/types';
-import { fetchEpisodeWithCache, getWaitTime, sleep } from '@/lib/novelFetcher';
-import generateEpub from '@/lib/epub/generator';
+import { Episode, EpisodeStatus, DownloadedEpisode } from '@/types';
+import { fetchEpisodeWithCache, getWaitTime, sleep } from '@/lib/novel-fetcher';
+import { EPUBGenerator, EPUBMetadata, InputChapter } from '@/lib/epub/core';
 import { createContextLogger } from '@/lib/logger';
 
 const downloadLogger = createContextLogger('download-hook');
@@ -32,7 +32,7 @@ export const useDownload = () => {
 
     setIsDownloading(true);
     const updatedStatus = { ...downloadStatus };
-    const downloadedEpisodes: Episode[] = [];
+    const downloadedEpisodes: DownloadedEpisode[] = [];
 
     try {
       const total = selectedEpisodes.length;
@@ -89,10 +89,37 @@ export const useDownload = () => {
       setCurrentProgress('EPUB生成中...');
       setIsGenerating(true);
 
-      const result = await generateEpub(workTitle, downloadedEpisodes, author, showGroupTitles);
-      if (!result.success) {
-        throw new Error(result.error || 'EPUBの生成に失敗しました');
-      }
+      const inputChapters: InputChapter[] = downloadedEpisodes.map(episode => ({
+        title: episode.title,
+        data: episode.content,
+        metadata: {
+          groupTitle: showGroupTitles ? episode.groupTitle : undefined,
+          date: episode.date,
+          originalUrl: episode.url
+        }
+      }));
+
+      const metadata: EPUBMetadata = {
+        title: workTitle,
+        author,
+        publisher: 'Kakuyomu Downloader',
+        tocTitle: '目次',
+        lang: 'ja',
+        modifiedDate: new Date().toISOString(),
+        content: [] // これはEPUBGenerator内部で設定される
+      };
+
+      const epubGenerator = new EPUBGenerator();
+      const blob = await epubGenerator.generateEPUB(inputChapters, metadata, {
+        aborted: signal.aborted
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${workTitle}.epub`;
+      a.click();
+      URL.revokeObjectURL(url);
 
       setCurrentProgress('完了しました');
       setTimeout(() => setCurrentProgress(''), 3000);

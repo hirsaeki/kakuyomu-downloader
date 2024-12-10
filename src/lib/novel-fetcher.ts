@@ -1,6 +1,7 @@
 import db from './database';
 import { NovelSiteAdapter, EpisodeListResult, EpisodeContentResult } from '@/adapters/types';
-import { ValidationError, NetworkError, NovelDownloaderError, Episode, EpisodeRecord } from '@/types';
+import { ValidationError, NetworkError, DatabaseError } from '@/lib/errors';
+import { Episode, EpisodeRecord } from '@/types';
 import { NETWORK_CONFIG } from '@/config/constants';
 import { createContextLogger } from './logger';
 
@@ -9,13 +10,14 @@ const fetchLogger = createContextLogger('NovelFetcher');
 /**
  * エピソードをDBレコード形式に変換する関数
  */
-function convertToEpisodeRecord(episode: Episode, workUrl: string): EpisodeRecord {
+function convertToEpisodeRecord(episode: Episode, workUrl: string, index: number): EpisodeRecord {
   const now = new Date();
   return {
     ...episode,
     workUrl,
     lastAccessed: now,
-    lastModified: now
+    lastModified: now,
+    order: index
   };
 }
 
@@ -57,7 +59,10 @@ export const fetchWorkWithCache = async (
         success: true,
         workTitle: cachedWork.workTitle,
         author: cachedWork.author,
-        episodes: cachedEpisodes,
+        episodes: cachedEpisodes.map(ep => ({
+          ...ep,
+          selected: false
+        })),
         error: null,
         fromCache: true
       };
@@ -73,14 +78,13 @@ export const fetchWorkWithCache = async (
     try {
       await db.saveWork(url, result.workTitle, result.author);
       // エピソードをDBレコード形式に変換して保存
-      const episodeRecords = result.episodes.map(ep => convertToEpisodeRecord(ep, url));
+      const episodeRecords = result.episodes.map((ep, index) => convertToEpisodeRecord(ep, url, index));
       await db.saveEpisodes(url, episodeRecords);
       fetchLogger.info(`Cached work: ${result.workTitle}`);
     } catch {
       // キャッシュ保存エラーは一時的なものとして扱う（再試行可能）
-      throw new NovelDownloaderError(
-        'キャッシュの保存に失敗しました。ストレージの空き容量を確認してください。',
-        true  // retriable = true
+      throw new DatabaseError(
+        'キャッシュの保存に失敗しました。ストレージの空き容量を確認してください。'
       );
     }
 
@@ -90,11 +94,11 @@ export const fetchWorkWithCache = async (
     };
 
   } catch (error) {
-    if (error instanceof ValidationError || error instanceof NetworkError || error instanceof NovelDownloaderError) {
+    if (error instanceof ValidationError || error instanceof NetworkError || error instanceof DatabaseError) {
       throw error;
     }
     fetchLogger.error('Unexpected error in fetchWorkWithCache:', error);
-    throw new NovelDownloaderError(
+    throw new DatabaseError(
       error instanceof Error ? error.message : '不明なエラーが発生しました'
     );
   }
@@ -136,9 +140,8 @@ export const fetchEpisodeWithCache = async (
       fetchLogger.info(`Cached episode: ${result.title}`);
     } catch {
       // キャッシュ保存エラーは一時的なものとして扱う（再試行可能）
-      throw new NovelDownloaderError(
-        'キャッシュの保存に失敗しました。ストレージの空き容量を確認してください。',
-        true  // retriable = true
+      throw new DatabaseError(
+        'キャッシュの保存に失敗しました。ストレージの空き容量を確認してください。'
       );
     }
 
@@ -148,11 +151,11 @@ export const fetchEpisodeWithCache = async (
     };
 
   } catch (error) {
-    if (error instanceof ValidationError || error instanceof NetworkError || error instanceof NovelDownloaderError) {
+    if (error instanceof ValidationError || error instanceof NetworkError || error instanceof DatabaseError) {
       throw error;
     }
     fetchLogger.error('Unexpected error in fetchEpisodeWithCache:', error);
-    throw new NovelDownloaderError(
+    throw new DatabaseError(
       error instanceof Error ? error.message : '不明なエラーが発生しました'
     );
   }
@@ -166,9 +169,8 @@ export const clearWorkCache = async (url: string): Promise<void> => {
     await db.clearWorkCache(url);
     fetchLogger.info(`Cleared cache for work: ${url}`);
   } catch {
-    throw new NovelDownloaderError(
-      'キャッシュの削除に失敗しました。再度お試しください。',
-      true  // retriable = true
+    throw new DatabaseError(
+      'キャッシュの削除に失敗しました。再度お試しください。'
     );
   }
 };
@@ -190,9 +192,8 @@ export const clearEpisodesCache = async (episodes: Episode[]): Promise<void> => 
     );
     fetchLogger.info(`Cleared cache for ${episodeUrls.length} episodes`);
   } catch {
-    throw new NovelDownloaderError(
-      'エピソードキャッシュの削除に失敗しました。',
-      true
+    throw new DatabaseError(
+      'エピソードキャッシュの削除に失敗しました。'
     );
   }
 };

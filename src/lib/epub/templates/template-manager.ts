@@ -1,10 +1,11 @@
-import type { OutputChapter, MetadataOptions, TemplateResult } from './core/types';
+import type { OutputChapter, TemplateResult } from './core/types';
+import type { EPUBMetadata } from '../core/types';
 import { generateContainerXml, generateNavigationXml, generateContentOpf } from './core';
 import EPUB_CONFIG from '@/config/epub'
 
 export function generateXmlTemplates(
   lang?: string,
-  options?: MetadataOptions,
+  options?: EPUBMetadata,
   chapters?: OutputChapter[],
   uuid?: string
 ): TemplateResult {
@@ -19,5 +20,3 @@ export function generateXmlTemplates(
 
   return { containerXml, navXhtml, contentOpf };
 }
-
-export type { OutputChapter, MetadataOptions, TemplateResult };

@@ -1,4 +1,4 @@
-import { TextProcessingError } from '@/lib/text-processing/core/processing-error';
+import { ProcessorError } from '@/lib/errors';
 
 export function generateUUID(): string {
   try {
@@ -13,7 +13,7 @@ export function generateUUID(): string {
       return v.toString(16);
     });
   } catch {
-    throw new TextProcessingError('Failed to generate UUID');
+    throw new ProcessorError('Failed to generate UUID');
   }
 }
 

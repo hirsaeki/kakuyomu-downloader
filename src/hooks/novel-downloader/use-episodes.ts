@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Episode } from '@/types';
 import { NovelSiteAdapter } from '@/adapters/types';
-import { fetchWorkWithCache, clearWorkCache } from '@/lib/novelFetcher';
+import { fetchWorkWithCache, clearWorkCache } from '@/lib/novel-fetcher';
 import { createContextLogger } from '@/lib/logger';
 
 const episodeLogger = createContextLogger('episode-hook');

@@ -3,7 +3,7 @@ import { TransformExecutor } from '../transform/transform-executor';
 // @ts-expect-error Viteプラグインで作成されるtsファイル
 import type { GeneratedPattern } from '../config/generated/patterns';
 import type { ProcessedRange } from '../transform/base/types';
-import { NovelDownloaderError, ValidationError } from '@/types';
+import { ProcessorError, ValidationError } from '@/lib/errors';
 import { TEXT_PROCESSING_CONFIG } from '@/config/constants';
 import DOMPurify from 'dompurify';
 import { createContextLogger } from '@/lib/logger';
@@ -23,7 +23,7 @@ export class TypographyProcessor {
     private domOperator: TypographyDOMOperator
   ) {
     if (!patterns || !domOperator) {
-      throw new NovelDownloaderError('Patterns and DOMOperator are required');
+      throw new ProcessorError('Patterns and DOMOperator are required');
     }
     this.initializeExecutors();
   }
@@ -36,7 +36,7 @@ export class TypographyProcessor {
       TypographyProcessor.instance = new TypographyProcessor(patterns, domOperator);
     }
     if (!TypographyProcessor.instance) {
-      throw new NovelDownloaderError('TypographyProcessor is not initialized');
+      throw new ProcessorError('TypographyProcessor is not initialized');
     }
     return TypographyProcessor.instance;
   }
@@ -66,16 +66,16 @@ export class TypographyProcessor {
       const result = this.formatXhtml(serialized);
 
       if (doc.getElementsByTagName('parsererror').length > 0) {
-        throw new NovelDownloaderError('Invalid XHTML generated');
+        throw new ProcessorError('Invalid XHTML generated');
       }
 
       return result;
 
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof NovelDownloaderError) {
+      if (error instanceof ValidationError || error instanceof ProcessorError) {
         throw error;
       }
-      throw new NovelDownloaderError(
+      throw new ProcessorError(
         `XHTML conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
@@ -271,7 +271,7 @@ export class TypographyProcessor {
   private moveContent(source: Node, target: Node): void {
     const ownerDocument = target.ownerDocument;
     if (!ownerDocument) {
-      throw new NovelDownloaderError('Target node has no ownerDocument');
+      throw new ProcessorError('Target node has no ownerDocument');
     }
 
     Array.from(source.childNodes).forEach(node => {

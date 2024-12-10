@@ -1,4 +1,4 @@
-import { NetworkError, ValidationError } from '@/types';
+import { NetworkError, ValidationError } from '@/lib/errors';
 import { HttpClientError } from './types';
 
 interface ApiErrorResponse {

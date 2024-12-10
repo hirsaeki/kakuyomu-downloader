@@ -1,4 +1,4 @@
-import { AppError } from './base';
+import { AppError, ErrorCode } from './base';
 
 /**
  * 生成処理に関するエラー
@@ -7,7 +7,7 @@ import { AppError } from './base';
 export class GenerationError extends AppError {
   constructor(
     message: string,
-    code: string = 'GENERATION_ERROR'
+    code: ErrorCode = 'GENERATION_ERROR'
   ) {
     super(message, code);
     Object.setPrototypeOf(this, GenerationError.prototype);

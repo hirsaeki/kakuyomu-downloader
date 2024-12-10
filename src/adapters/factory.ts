@@ -1,5 +1,5 @@
 import { NovelSiteAdapter, NovelSiteAdapterFactory } from './types';
-import { ValidationError } from '@/types';
+import { ValidationError } from '@/lib/errors';
 import { FetchHttpClient } from '@/lib/http/fetch-client';
 import { NETWORK_CONFIG } from '@/config/constants';
 

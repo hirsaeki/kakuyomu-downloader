@@ -1,4 +1,4 @@
-import { AppError } from './base';
+import { ErrorCode, AppError } from './base';
 
 /**
  * テキスト変換に関するエラー
@@ -7,7 +7,7 @@ import { AppError } from './base';
 export class TransformError extends AppError {
   constructor(
     message: string,
-    code: string = 'TRANSFORM_ERROR'
+    code: ErrorCode = 'TRANSFORM_ERROR'
   ) {
     super(message, code);
     Object.setPrototypeOf(this, TransformError.prototype);
