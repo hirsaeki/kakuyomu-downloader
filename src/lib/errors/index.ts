@@ -7,3 +7,4 @@ export * from './processor';
 export * from './transform';
 export * from './database';
 export * from './dom';
+export * from './pattern';

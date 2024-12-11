@@ -13,6 +13,8 @@ interface EpubTransformOptions {
 }
 
 export class EpubTransformer extends BaseTransformStep {
+  private readonly options: EpubTransformOptions;
+  private readonly patterns: PatternConfig[];
   private steps: BaseTransformStep[] = [];
 
   constructor(
@@ -23,6 +25,8 @@ export class EpubTransformer extends BaseTransformStep {
     }
   ) {
     super();
+    this.patterns = patterns;
+    this.options = options;
     
     // 基本的な段落処理は常に有効
     this.steps.push(new ParagraphTransformStep());
@@ -38,6 +42,12 @@ export class EpubTransformer extends BaseTransformStep {
     }
   }
 
+  getConfig(): { patterns: PatternConfig[]; options: EpubTransformOptions } {
+    return {
+      patterns: this.patterns,
+      options: this.options
+    }
+  }
   protected async processTransform(context: TransformContext): Promise<TransformResult> {
     try {
       let currentText = context.text;

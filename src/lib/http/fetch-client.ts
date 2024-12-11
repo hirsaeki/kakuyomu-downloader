@@ -1,6 +1,9 @@
 import { HttpClient, HttpClientConfig, HttpClientError, HttpResponse, ProxyConfig } from './types';
 import { validateResponse } from './errors';
 import { NETWORK_CONFIG } from '@/config/constants';
+import { createContextLogger } from '@/lib/logger';
+
+const httpLogger = createContextLogger('http');
 
 /**
  * Fetch APIを使用したHTTPクライアントの実装
@@ -32,6 +35,10 @@ export class FetchHttpClient implements HttpClient {
       ...config
     };
     this.proxyConfig = proxyConfig;
+    httpLogger.debug('HTTPクライアントを初期化', {
+      config: this.config,
+      hasProxyConfig: !!proxyConfig
+    });
   }
 
   /**
@@ -39,12 +46,14 @@ export class FetchHttpClient implements HttpClient {
    */
   setHeaders(headers: Record<string, string> | undefined): void {
     this.customHeaders = headers;
+    httpLogger.debug('カスタムヘッダーを設定', { headers });
   }
 
   /**
    * 設定を更新
    */
   setConfig(config: Partial<HttpClientConfig>): void {
+    const oldConfig = { ...this.config };
     this.config = {
       ...this.config,
       ...config,
@@ -61,6 +70,10 @@ export class FetchHttpClient implements HttpClient {
         ...config.headers
       }
     };
+    httpLogger.debug('設定を更新', {
+      oldConfig,
+      newConfig: this.config
+    });
   }
 
   /**
@@ -68,24 +81,41 @@ export class FetchHttpClient implements HttpClient {
    */
   setProxyConfig(config: ProxyConfig | undefined): void {
     this.proxyConfig = config;
+    httpLogger.debug('プロキシ設定を更新', {
+      hasProxyConfig: !!config
+    });
   }
 
   /**
    * GETリクエストを実行
    */
   async get<T>(url: string): Promise<HttpResponse<T>> {
+    httpLogger.info('リクエスト開始', { url });
     let lastError: Error | null = null;
     const maxAttempts = this.config.retry?.maxAttempts ?? 1;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        // プロキシURLの構築
+        if (attempt > 0) {
+          httpLogger.debug('リトライ実行', {
+            attempt: attempt + 1,
+            maxAttempts,
+            url
+          });
+        }
+
         const requestUrl = this.proxyConfig
           ? this.proxyConfig.buildUrl(url)
           : url;
 
         const response = await this.executeRequest(requestUrl);
         const data = await this.parseResponse<T>(response);
+
+        httpLogger.info('リクエスト成功', {
+          url,
+          status: response.status,
+          contentType: response.headers.get('content-type')
+        });
 
         return {
           data,
@@ -97,16 +127,36 @@ export class FetchHttpClient implements HttpClient {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
         if (error instanceof HttpClientError) {
-          // リトライ可能なエラーの場合は待機して再試行
           if (this.isRetryableError(error) && attempt < maxAttempts - 1) {
+            httpLogger.warn('リトライ可能なエラーが発生', {
+              attempt: attempt + 1,
+              maxAttempts,
+              error: error.message,
+              status: error.status,
+              url
+            });
             await this.delay(attempt);
             continue;
           }
         }
+        httpLogger.error('リクエスト失敗', {
+          attempt: attempt + 1,
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          } : 'Unknown error',
+          url
+        });
         throw error;
       }
     }
 
+    httpLogger.error('リトライ回数超過', {
+      maxAttempts,
+      url,
+      error: lastError
+    });
     throw lastError || new HttpClientError('Max retry attempts exceeded');
   }
 
@@ -120,6 +170,10 @@ export class FetchHttpClient implements HttpClient {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         controller.abort();
+        httpLogger.warn('リクエストタイムアウト', {
+          url,
+          timeout: this.config.timeouts?.request
+        });
         reject(new HttpClientError('Request timeout'));
       }, this.config.timeouts?.request);
     });
@@ -134,6 +188,14 @@ export class FetchHttpClient implements HttpClient {
     });
 
     try {
+      httpLogger.debug('リクエスト実行', {
+        url,
+        headers: {
+          ...this.config.headers,
+          ...(this.customHeaders || {})
+        }
+      });
+
       // タイムアウトとリクエストをrace
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
 
@@ -167,6 +229,7 @@ export class FetchHttpClient implements HttpClient {
    */
   private async parseResponse<T>(response: Response): Promise<T> {
     const contentType = response.headers.get('content-type');
+    httpLogger.debug('レスポンスのパース開始', { contentType });
 
     if (contentType?.includes('application/json')) {
       const data = await response.json();
@@ -179,6 +242,7 @@ export class FetchHttpClient implements HttpClient {
       return text as unknown as T;
     }
 
+    httpLogger.warn('未対応のContent-Type', { contentType });
     throw new HttpClientError(
       `Unsupported content type: ${contentType}`,
       response.status,
@@ -194,6 +258,7 @@ export class FetchHttpClient implements HttpClient {
     response.headers.forEach((value, key) => {
       headers[key] = value;
     });
+    httpLogger.debug('レスポンスヘッダーを抽出', { headers });
     return headers;
   }
 
@@ -201,11 +266,21 @@ export class FetchHttpClient implements HttpClient {
    * リトライ可能なエラーかチェック
    */
   private isRetryableError(error: HttpClientError): boolean {
-    return (
+    const isRetryable = (
       error.status === undefined || // ネットワークエラー
       error.status === 429 || // レート制限
       error.status >= 500 // サーバーエラー
     );
+
+    httpLogger.debug('リトライ可否を判定', {
+      error: {
+        message: error.message,
+        status: error.status
+      },
+      isRetryable
+    });
+
+    return isRetryable;
   }
 
   /**
@@ -223,6 +298,13 @@ export class FetchHttpClient implements HttpClient {
     // ±25%のジッター
     const jitter = exponentialDelay * 0.5 * (Math.random() - 0.5);
     const delay = Math.round(exponentialDelay + jitter);
+
+    httpLogger.debug('リトライ待機', {
+      attempt,
+      baseDelay,
+      maxDelay,
+      calculatedDelay: delay
+    });
 
     await new Promise(resolve => setTimeout(resolve, delay));
   }

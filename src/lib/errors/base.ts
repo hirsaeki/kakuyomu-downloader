@@ -9,6 +9,7 @@ export type ErrorCode =
   | 'TRANSFORM_ERROR'       // 変換エラー
   | 'GENERATION_ERROR'      // 生成エラー
   | 'PARSER_ERROR'          // パースエラー
+  | 'PATTERN_ERROR'          // 変換パターン(yaml → ts)エラー
   | 'DATABASE_ERROR'        // データベースエラー
   | 'DOM_ERROR'             // DOM操作のエラー
   | 'GENERAL_ERROR';        // その他の一般エラー

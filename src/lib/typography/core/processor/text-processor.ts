@@ -2,6 +2,9 @@ import type { PatternConfig, TransformContext } from '../transform/base/types';
 import { ProcessorError } from '@/lib/errors';
 import { EpubTransformer } from '../transform/epub';
 import EPUB_CONFIG from '@/config/epub';
+import { createContextLogger } from '@/lib/logger';
+
+const processorLogger = createContextLogger('typography-processor');
 
 export interface TextProcessorOptions {
   /**
@@ -28,7 +31,7 @@ export class TextProcessor {
   private transformer: EpubTransformer;
 
   private constructor() {
-    // デフォルトのパターンとオプションで初期化
+    processorLogger.debug('Initializing TextProcessor');
     this.transformer = new EpubTransformer(
       [],  // TODO: デフォルトパターンの実装
       {
@@ -43,6 +46,7 @@ export class TextProcessor {
    */
   public static getInstance(): TextProcessor {
     if (!TextProcessor.instance) {
+      processorLogger.info('Creating new TextProcessor instance');
       TextProcessor.instance = new TextProcessor();
     }
     return TextProcessor.instance;
@@ -55,6 +59,8 @@ export class TextProcessor {
     text: string,
     title: string
   ): Promise<string> {
+    processorLogger.info('Converting text to XHTML', { title, textLength: text.length });
+
     try {
       // テキストの変換を実行
       const context: TransformContext = {
@@ -62,11 +68,27 @@ export class TextProcessor {
         processedRanges: []
       };
 
+      processorLogger.debug('Starting transformation', {
+        transformerConfig: this.transformer.getConfig()
+      });
+
       const result = await this.transformer.execute(context);
 
+      processorLogger.debug('Transformation completed', {
+        processedRangesCount: context.processedRanges?.length ?? 0
+      });
+
       // XHTMLテンプレートの生成
-      return this.wrapInXhtml(result.content, title);
+      const xhtml = this.wrapInXhtml(result.content, title);
+
+      processorLogger.info('XHTML conversion completed', {
+        inputLength: text.length,
+        outputLength: xhtml.length
+      });
+
+      return xhtml;
     } catch (error) {
+      processorLogger.error('XHTML conversion failed', error);
       throw new ProcessorError(
         `テキスト変換に失敗: ${error instanceof Error ? error.message : 'XHTML変換エラー'}`
       );

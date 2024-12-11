@@ -39,14 +39,18 @@ export class ConvertGroupsStep extends BaseTransformStep {
   }
 
   protected async processTransform(context: TransformContext): Promise<TransformResult> {
-    if (!context.match) {
+    const { match } = context;
+    if (!match) {
       throw new TransformError('Invalid context: match is required');
     }
 
     try {
       const convertedGroups = await Promise.all(
         this.rules.map(async ({ group, rule }) => {
-          const groupContent = context.match![group];
+          const groupContent = match[group];
+          if (groupContent === undefined) {
+            throw new TransformError(`Group ${group} not found in match`);
+          }
           return this.applyRule(groupContent, rule);
         })
       );

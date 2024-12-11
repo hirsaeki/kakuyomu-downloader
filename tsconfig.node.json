@@ -5,7 +5,11 @@
     "moduleResolution": "bundler",
     "module": "ESNext",
     "types": ["node"],
-    "allowImportingTsExtensions": false
+    "allowImportingTsExtensions": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./server/*"]
+    }
   },
   "include": ["vite.config.ts", "server/**/*"]
 }
