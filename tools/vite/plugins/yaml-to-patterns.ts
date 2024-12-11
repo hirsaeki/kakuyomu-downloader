@@ -1,12 +1,12 @@
 import { Plugin } from 'vite';
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
-import type { PatternConfig } from '@/lib/typography/core/transform/base/types';
-import { ValidationError, PatternError } from '@/lib/errors';
-import { createContextLogger } from '@/lib/logger';
+import type { PatternConfig } from '../types/patterns';
+import { ValidationError, PatternError } from '../lib/errors';
+import { createLogger } from '../lib/logger';
 
-const patternLogger = createContextLogger('PatternManager');
+const patternLogger = createLogger('PatternManager');
 
 export const DEFAULT_PATTERNS_DIR = 'src/lib/typography/config/patterns';
 

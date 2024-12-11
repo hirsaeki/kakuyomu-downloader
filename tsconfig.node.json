@@ -11,5 +11,5 @@
       "@/*": ["./server/*"]
     }
   },
-  "include": ["vite.config.ts", "server/**/*", "build/**/*"]
+  "include": ["vite.config.ts", "server/**/*", "tools/**/*"]
 }
