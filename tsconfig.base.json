@@ -15,10 +15,6 @@
     "allowJs": true,
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
   },
   "exclude": ["node_modules"]
 }
