@@ -1,5 +1,5 @@
 import db from './database';
-import { NovelSiteAdapter, EpisodeListResult, EpisodeContentResult } from '@/adapters/types';
+import { BaseNovelSiteAdapter, EpisodeListResult, EpisodeContentResult } from '@/adapters';
 import { ValidationError, NetworkError, DatabaseError } from '@/lib/errors';
 import { Episode, EpisodeRecord } from '@/types';
 import { NETWORK_CONFIG } from '@/config/constants';
@@ -42,9 +42,9 @@ export const sleep = (ms: number): Promise<void> =>
  * 作品一覧の取得（キャッシュ制御付き）
  */
 export const fetchWorkWithCache = async (
-  adapter: NovelSiteAdapter,
+  adapter: BaseNovelSiteAdapter<unknown>,
   url: string
-): Promise<EpisodeListResult> => {
+): Promise<EpisodeListResult & { fromCache?: boolean }> => {
   if (!adapter.isCompatible(url)) {
     throw new ValidationError('無効なURLです');
   }
@@ -108,7 +108,7 @@ export const fetchWorkWithCache = async (
  * エピソードの取得（キャッシュ制御付き）
  */
 export const fetchEpisodeWithCache = async (
-  adapter: NovelSiteAdapter,
+  adapter: BaseNovelSiteAdapter<unknown>,
   episodeUrl: string
 ): Promise<EpisodeContentResult> => {
   if (!episodeUrl) {

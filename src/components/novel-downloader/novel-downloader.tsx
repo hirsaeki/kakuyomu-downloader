@@ -7,9 +7,13 @@ import { ErrorAlert, ProgressAlert, WarningAlert, ClearCacheDialog } from './ale
 import { DownloadControls, SelectionControls } from './controls';
 import { EpisodeList } from './episode';
 import { useNovelDownloader } from '@/hooks/novel-downloader';
-import { adapterRegistry } from '@/adapters/factory';
+import { setupAdapters } from '@/adapters';
+import { BaseNovelSiteAdapter } from '@/adapters';
 
 export const NovelDownloader: React.FC = () => {
+  // アプリケーション起動時にファクトリーを初期化
+  const factory = setupAdapters();
+  
   const {
     url,
     setUrl,
@@ -35,10 +39,10 @@ export const NovelDownloader: React.FC = () => {
     setShowGroupTitles,
     setShowClearDialog,
     cancelDownload,
-  } = useNovelDownloader();
+  } = useNovelDownloader(factory);
 
-  // 登録済みのアダプター一覧...って、これくらい分かるでしょ？
-  const adapters = adapterRegistry.getRegisteredAdapters();
+  // 登録済みのアダプター一覧を取得
+  const adapters = factory.getRegisteredAdapters();
 
   return (
     <Card className="w-full max-w-4xl">
@@ -47,18 +51,16 @@ export const NovelDownloader: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* アラート表示... こんな基本的なことも説明しないといけないの？*/}
           {error && <ErrorAlert message={error} />}
           {url && !currentAdapter && (
             <WarningAlert 
-              message={`対応サイト: ${adapters.map(a => a.siteName).join(', ')}`} 
+              message={`対応サイト: ${adapters.map((a: BaseNovelSiteAdapter) => a.siteName).join(', ')}`} 
             />
           )}
           {(loading || isDownloading || isGenerating || isClearing) && 
             currentProgress && <ProgressAlert message={currentProgress} />
           }
 
-          {/* URL入力フォーム... はぁ、UIの基本よね */}
           <div className="flex space-x-2">
             <Input
               type="url"
@@ -96,7 +98,6 @@ export const NovelDownloader: React.FC = () => {
             )}
           </div>
 
-          {/* サイト情報... これも説明不要よね？ */}
           {currentAdapter && (
             <div className="text-sm">
               選択中のサイト: {currentAdapter.siteName}
@@ -105,7 +106,6 @@ export const NovelDownloader: React.FC = () => {
 
           {episodes.length > 0 && (
             <>
-              {/* 作品情報... ふん、見れば分かるでしょ？ */}
               {workTitle && (
                 <div className="space-y-2">
                   <div className="text-lg font-medium">
@@ -117,7 +117,6 @@ export const NovelDownloader: React.FC = () => {
                 </div>
               )}
               
-              {/* コントロールパネル... まぁ、ちゃんと分割したからね！ */}
               <div className="flex justify-between">
                 <SelectionControls
                   selectAll={selectAll}
@@ -136,7 +135,6 @@ export const NovelDownloader: React.FC = () => {
                 />
               </div>
 
-              {/* エピソードリスト... これで完璧でしょ？ */}
               <EpisodeList
                 episodes={episodes}
                 downloadStatus={downloadStatus}
@@ -147,7 +145,6 @@ export const NovelDownloader: React.FC = () => {
           )}
         </div>
 
-        {/* キャッシュクリア確認ダイアログ */}
         <ClearCacheDialog
           isOpen={showClearDialog}
           onConfirm={handleClearCache}
@@ -157,5 +154,3 @@ export const NovelDownloader: React.FC = () => {
     </Card>
   );
 };
-
-export default NovelDownloader;

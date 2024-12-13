@@ -1,22 +1,45 @@
 import express from 'express';
+import type { RequestHandler } from 'express';
 import cors from 'cors';
-import { fetchNovelContent } from './controllers/novel-controller';
-import { createContextLogger } from './logger';
-import { errorHandler } from './middleware/error-handler';
+import fetch from 'node-fetch';
+import { logger } from './logger';
 
-const serverLogger = createContextLogger('Server');
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ?? 3000;
 
 app.use(cors());
-app.use(express.json());
 
-// コンテンツ取得のエンドポイント
-app.get('/api/fetch-content', fetchNovelContent);
+const proxyHandler: RequestHandler = async (req, res) => {
+  const { url } = req.query;
 
-// エラーハンドラーは全てのルーティングの後に配置
-app.use(errorHandler);
+  if (!url || typeof url !== 'string') {
+    logger.warn('URLパラメータが見つかりません');
+    res.status(400).send('URLが必要です');
+    return;
+  }
+
+  try {
+    logger.info(`プロキシリクエスト: ${url}`);
+    const response = await fetch(url);
+    const content = await response.text();
+    logger.info(`プロキシレスポンス成功: ${url}`);
+    res.send(content);
+    return;
+  } catch (error) {
+    logger.error('プロキシリクエストエラー', {
+      url,
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack
+      } : 'Unknown error'
+    });
+    res.status(500).send('失敗しました');
+    return;
+  }
+};
+
+app.get('/api/fetch-content', proxyHandler);
 
 app.listen(PORT, () => {
-  serverLogger.info(`Server running at http://localhost:${PORT}`);
+  logger.info(`Proxy server running at http://localhost:${PORT}`);
 });

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Episode } from '@/types';
-import { NovelSiteAdapter } from '@/adapters/types';
+import { BaseNovelSiteAdapter } from '@/adapters';
 import { fetchWorkWithCache, clearWorkCache } from '@/lib/novel-fetcher';
 import { createContextLogger } from '@/lib/logger';
 
@@ -17,7 +17,7 @@ export const useEpisodes = () => {
 
   // エピソード一覧の取得
   const fetchEpisodes = useCallback(async (
-    adapter: NovelSiteAdapter,
+    adapter: BaseNovelSiteAdapter,
     url: string,
     onSuccess: (title: string, author: string) => void
   ) => {

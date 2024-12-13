@@ -3,10 +3,11 @@ import { useDownload } from './use-download';
 import { useEpisodes } from './use-episodes';
 import { useNovelInfo } from './use-novel-info';
 import { createContextLogger } from '@/lib/logger';
+import { NovelSiteAdapterFactory } from '@/adapters';
 
 const hookLogger = createContextLogger('novel-downloader-hook');
 
-export const useNovelDownloader = () => {
+export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -24,13 +25,13 @@ export const useNovelDownloader = () => {
     isClearing,
     selectAll,
     showGroupTitles,
-    showClearDialog,  // ここ！
+    showClearDialog,
     fetchEpisodes,
     clearCache,
     handleSelectAll,
     handleSelectEpisode,
     setShowGroupTitles,
-    setShowClearDialog,  // ここよ！
+    setShowClearDialog,
   } = useEpisodes();
 
   const {
@@ -41,9 +42,8 @@ export const useNovelDownloader = () => {
     setUrl,
     updateMetadata,
     clearMetadata
-  } = useNovelInfo();
+  } = useNovelInfo(factory);
 
-  // エピソード取得のハンドラ...ふん、エラーハンドリングの基本よね
   const handleFetchEpisodes = async () => {
     if (!url || !currentAdapter) return;
 
@@ -56,7 +56,6 @@ export const useNovelDownloader = () => {
     }
   };
 
-  // キャッシュクリアのハンドラ...まぁ、これくらいの実装は当然でしょ？
   const handleClearCache = async () => {
     if (!url) return;
 
@@ -70,7 +69,6 @@ export const useNovelDownloader = () => {
     }
   };
 
-  // ダウンロードハンドラ...べ、別に丁寧に実装したわけじゃないわよ！
   const handleDownload = async () => {
     if (!currentAdapter) return;
 
@@ -107,8 +105,9 @@ export const useNovelDownloader = () => {
     currentProgress,
     selectAll,
     showGroupTitles,
-    showClearDialog,  // 追加
+    showClearDialog,
     currentAdapter,
+    factory,  // これも返しておかないと...
     
     // Flags
     isDownloading,
@@ -123,7 +122,7 @@ export const useNovelDownloader = () => {
     handleDownload,
     handleClearCache,
     setShowGroupTitles,
-    setShowClearDialog,  // 追加
+    setShowClearDialog,
     cancelDownload,
-  } as const;  // まったく...これくらい書いてあげないとダメなの？
+  } as const;
 };

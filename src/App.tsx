@@ -1,25 +1,14 @@
 import React, { useEffect } from 'react';
 import NovelDownloader from '@/components/novel-downloader';
 import LoggerControls from '@/components/logger-control';
-import { adapterRegistry } from './adapters/factory';
-import { KakuyomuAdapterFactory } from './adapters/kakuyomu/factory';
+import { setupAdapters } from '@/adapters';
 
 const App: React.FC = () => {
   // アプリケーション起動時にアダプターを登録
   useEffect(() => {
-    const kakuyomuAdapter = new KakuyomuAdapterFactory().createAdapter({
-      httpClient: adapterRegistry.getHttpClient(),
-      proxyConfig: {
-        endpoint: '/api/fetch-content',
-        buildUrl: (url) => `/api/fetch-content?url=${encodeURIComponent(url)}`
-      }
-    });
-    
-    adapterRegistry.register(kakuyomuAdapter);
-    
-    // クリーンアップ
+    setupAdapters();
     return () => {
-      adapterRegistry.clear();
+      // クリーンアップ処理は自動的に行われます
     };
   }, []);
 

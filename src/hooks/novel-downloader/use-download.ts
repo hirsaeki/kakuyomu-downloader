@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { NovelSiteAdapter } from '@/adapters/types';
+import { BaseNovelSiteAdapter } from '@/adapters';
 import { Episode, EpisodeStatus, DownloadedEpisode } from '@/types';
 import { fetchEpisodeWithCache, getWaitTime, sleep } from '@/lib/novel-fetcher';
 import { EPUBGenerator, EPUBMetadata, InputChapter } from '@/lib/epub/core';
@@ -21,7 +21,7 @@ export const useDownload = () => {
     workTitle: string,
     author: string,
     showGroupTitles: boolean,
-    adapter: NovelSiteAdapter
+    adapter: BaseNovelSiteAdapter
   ) => {
     if (selectedEpisodes.length === 0) {
       throw new Error('エピソードを選択してください');

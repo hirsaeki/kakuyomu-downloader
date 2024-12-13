@@ -61,15 +61,6 @@
 
 @layer base {
   * {
-    @apply tailwind.config.cjsborder-border;
-  }
-  body {
-    @apply tailwind.config.cjsbg-background tailwind.config.cjstext-foreground;
-  }
-}
-
-@layer base {
-  * {
     @apply border-border;
   }
   body {

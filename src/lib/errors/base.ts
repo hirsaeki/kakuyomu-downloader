@@ -12,6 +12,7 @@ export type ErrorCode =
   | 'PATTERN_ERROR'          // 変換パターン(yaml → ts)エラー
   | 'DATABASE_ERROR'        // データベースエラー
   | 'DOM_ERROR'             // DOM操作のエラー
+  | 'NOT_IMPLEMENTED'       // DOM操作のエラー
   | 'GENERAL_ERROR';        // その他の一般エラー
 
 /**

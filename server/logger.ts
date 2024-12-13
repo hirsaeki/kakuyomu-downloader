@@ -1,76 +1,52 @@
 import winston from 'winston';
+import 'winston-daily-rotate-file';
 import path from 'path';
+import { access, mkdir } from 'fs/promises';
 
-// ログ出力ディレクトリの設定
-const LOG_DIR = 'logs';
-const LOG_FILE = path.join(LOG_DIR, 'server.log');
-const ERROR_LOG_FILE = path.join(LOG_DIR, 'error.log');
+const LOG_DIR = process.env.LOG_DIR ?? './logs';
+const LOG_LEVEL = process.env.LOG_LEVEL ?? 'info';
+const LOG_MAX_SIZE = process.env.LOG_MAX_SIZE ?? '10m';
+const LOG_MAX_FILES = process.env.LOG_MAX_FILES ?? '14d';
 
-// ログフォーマットの定義
-const logFormat = winston.format.combine(
-  winston.format.timestamp(),
-  winston.format.json()
-);
+// ログディレクトリの作成
+try {
+  await access(LOG_DIR)
+} catch  {
+  await mkdir(LOG_DIR, { recursive: true })
+}
 
-// ロガーの設定
 const logger = winston.createLogger({
-  format: logFormat,
+  level: LOG_LEVEL,
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
   transports: [
-    // 通常のログはserver.logに
-    new winston.transports.File({ 
-      filename: LOG_FILE,
-      level: 'info'
+    // コンソール出力
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
     }),
-    // エラーログは別ファイルにも
-    new winston.transports.File({ 
-      filename: ERROR_LOG_FILE,
-      level: 'error'
+    // 通常ログ（日次ローテーション）
+    new winston.transports.DailyRotateFile({
+      filename: path.join(LOG_DIR, 'proxy-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: LOG_MAX_SIZE,
+      maxFiles: LOG_MAX_FILES,
+      auditFile: path.join(LOG_DIR, '.audit.json')
     }),
-    // 開発時は標準出力にも表示
-    ...(process.env.NODE_ENV === 'development' ? [
-      new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.colorize(),
-          winston.format.simple()
-        )
-      })
-    ] : [])
+    // エラーログ（日次ローテーション）
+    new winston.transports.DailyRotateFile({
+      filename: path.join(LOG_DIR, 'proxy-error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: LOG_MAX_SIZE,
+      maxFiles: LOG_MAX_FILES,
+      level: 'error',
+      auditFile: path.join(LOG_DIR, '.audit-error.json')
+    })
   ]
 });
 
-// ログローテーションの設定（オプション）
-import 'winston-daily-rotate-file';
-
-const dailyRotateTransport = new winston.transports.DailyRotateFile({
-  filename: path.join(LOG_DIR, 'server-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  maxFiles: '14d',  // 14日分保持
-  maxSize: '20m'    // ファイルサイズ上限
-});
-
-logger.add(dailyRotateTransport);
-
 export { logger };
-
-// コンテキストロガーの作成ヘルパー
-export function createContextLogger(context: string) {
-  return {
-    debug: (message: string, meta?: object) => {
-      logger.debug(message, { context, ...meta });
-    },
-    info: (message: string, meta?: object) => {
-      logger.info(message, { context, ...meta });
-    },
-    warn: (message: string, meta?: object) => {
-      logger.warn(message, { context, ...meta });
-    },
-    error: (message: string, error?: Error | unknown) => {
-      const errorData = error instanceof Error ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      } : error;
-      logger.error(message, { context, error: errorData });
-    }
-  };
-}
