@@ -32,6 +32,7 @@ export interface Episode {
   date: string;         // 公開日
   selected: boolean;    // UI上での選択状態
   content?: string;     // ダウンロード済みのコンテンツ（オプション）
+  order?: number;       // エピソードの表示順序（オプション）
 }
 
 // ダウンロード済みエピソード

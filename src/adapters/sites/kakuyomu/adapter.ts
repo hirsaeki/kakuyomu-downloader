@@ -33,11 +33,11 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
   } as const;
 
   constructor() {
-      const httpClient = new FetchHttpClient(
+    const httpClient = new FetchHttpClient(
       {
         headers: {
-        'Accept': NETWORK_CONFIG.HTTP.HEADERS.ACCEPT.HTML,
-        'Accept-Language': NETWORK_CONFIG.HTTP.HEADERS.ACCEPT_LANGUAGE,
+          'Accept': NETWORK_CONFIG.HTTP.HEADERS.ACCEPT.HTML,
+          'Accept-Language': NETWORK_CONFIG.HTTP.HEADERS.ACCEPT_LANGUAGE,
         }
       },
       {
@@ -60,7 +60,7 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     try {
       const response = await this.httpClient.get<string>(url);
       adapterLogger.info('コンテンツ取得成功', { url });
-      return response;  // text/htmlの文字列をそのまま返す
+      return response;
     } catch (error) {
       adapterLogger.error('コンテンツ取得失敗', {
         url,
@@ -96,13 +96,9 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
         throw new NetworkError('コンテンツの取得に失敗しました', true);
       }
 
-      const doc = new DOMParser().parseFromString(content, 'text/html');
+      // HTMLの妥当性検証
+      const doc = this.validateHtmlContent(content, normalizedUrl);
       const { workTitle, author, episodes } = this.parseWorkInfo(doc);
-
-      if (episodes.length === 0) {
-        adapterLogger.error('エピソードリストのパース失敗', { url: normalizedUrl });
-        throw new AppError('エピソードリストがパースできませんでした', 'GENERAL_ERROR');
-      }
 
       adapterLogger.info('エピソードリスト取得成功', {
         url: normalizedUrl,
@@ -160,7 +156,8 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
         throw new NetworkError('コンテンツの取得に失敗しました', true);
       }
 
-      const doc = new DOMParser().parseFromString(content, 'text/html');
+      // HTMLの妥当性検証
+      const doc = this.validateHtmlContent(content, normalizedUrl);
       const { title, content: parsedContent } = this.parseEpisodeContent(doc);
 
       adapterLogger.info('エピソード内容取得成功', {
@@ -255,61 +252,157 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
   }
 
+  private validateHtmlContent(content: string, url: string): Document {
+    // 空文字チェック
+    if (!content?.trim()) {
+      adapterLogger.error('コンテンツが空', { url });
+      throw new AppError('取得したコンテンツが空です', 'PARSER_ERROR');
+    }
+
+    // HTMLとしてパース
+    const doc = new DOMParser().parseFromString(content, 'text/html');
+
+    // パースエラーのチェック
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+      adapterLogger.error('HTMLパースエラー', { 
+        url,
+        error: parseError.textContent 
+      });
+      throw new AppError('HTMLの解析に失敗しました', 'PARSER_ERROR');
+    }
+
+    // 基本構造の検証
+    if (!doc.documentElement || !doc.body) {
+      adapterLogger.error('不正なHTML構造', { url });
+      throw new AppError('不正なHTML形式です', 'PARSER_ERROR');
+    }
+
+    // カクヨム特有の構造チェック
+    const expectedSelectors = [
+      { selector: KakuyomuAdapter.SELECTORS.TITLE, name: 'タイトル' },
+      { selector: KakuyomuAdapter.SELECTORS.AUTHOR, name: '著者名' }
+    ];
+
+    for (const { selector, name } of expectedSelectors) {
+      const element = doc.querySelector(selector);
+      if (!element) {
+        adapterLogger.error(`${name}要素が見つかりません`, { url, selector });
+        throw new AppError(
+          `カクヨムの作品ページとして必要な${name}要素が見つかりません`,
+          'PARSER_ERROR'
+        );
+      }
+
+      adapterLogger.debug(`${name}要素を検出`, { 
+        url, 
+        selector,
+        content: element.textContent?.trim() 
+      });
+    }
+
+    // メインコンテンツ領域の存在チェック
+    const mainContent = Array.from(doc.getElementsByTagName('div'))
+      .some(el => Array.from(el.classList)
+        .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.GROUP)));
+
+    if (!mainContent) {
+      adapterLogger.error('メインコンテンツが見つかりません', { url });
+      throw new AppError(
+        'カクヨムの作品ページとして必要なコンテンツが見つかりません',
+        'PARSER_ERROR'
+      );
+    }
+
+    return doc;
+  }
+
   private parseWorkInfo(doc: Document): { workTitle: string; author: string; episodes: Episode[] } {
+    // validateHtmlContent でチェック済みなので、non-null assertionを使用
     const titleElement = doc.querySelector(KakuyomuAdapter.SELECTORS.TITLE);
     const authorElement = doc.querySelector(KakuyomuAdapter.SELECTORS.AUTHOR);
 
     if (!titleElement || !authorElement) {
-      adapterLogger.error('作品情報の必須要素が不足');
-      throw new AppError('必要な要素が見つかりません', 'PARSER_ERROR');
+      throw new AppError('必須要素が見つかりません（これは起きないはずです）', 'PARSER_ERROR');
     }
-
+    
     const workTitle = titleElement.textContent?.trim() ?? '';
     const author = authorElement.textContent?.trim() ?? '';
 
-    // エピソードリストの取得
+    // エピソードの解析
+    const episodes = this.parseEpisodes(doc);
+
+    // 全エピソードの解析が失敗した場合は例外を投げる
+    if (episodes.length === 0) {
+      adapterLogger.error('有効なエピソードが見つかりません');
+      throw new AppError('エピソードの解析に失敗しました', 'PARSER_ERROR');
+    }
+
+    return { workTitle, author, episodes };
+  }
+
+  private findEpisodeLinks(group: Element): Element[] {
+    return Array.from(group.getElementsByTagName('a'))
+      .filter(el => Array.from(el.classList)
+        .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.EPISODE_LINK)));
+  }
+
+  private parseEpisodes(doc: Document): Episode[] {
     const episodeMap = new Map<string, Episode>();
+    let parseSuccessCount = 0;
+
+    // エピソードグループの取得（validateHtmlContent でチェック済み）
     const episodeGroups = Array.from(doc.getElementsByTagName('div'))
       .filter(el => Array.from(el.classList)
         .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.GROUP)));
 
-    if (episodeGroups.length === 0) {
-      adapterLogger.error('エピソードグループが不在');
-      throw new AppError('エピソードグループが見つかりません', 'PARSER_ERROR');
-    }
-
-    episodeGroups.forEach(group => {
+    episodeGroups.forEach((group, groupIndex) => {
       const groupTitle = group.querySelector('h3, h4')?.textContent?.trim();
-      const episodeLinks = Array.from(group.getElementsByTagName('a'))
-        .filter(el => Array.from(el.classList)
-          .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.EPISODE_LINK)));
+      const episodeLinks = this.findEpisodeLinks(group);
 
       adapterLogger.debug('エピソードグループ解析', {
         groupTitle,
-        linkCount: episodeLinks.length
+        linkCount: episodeLinks.length,
+        groupIndex
       });
 
-      episodeLinks.forEach(link => {
+      episodeLinks.forEach((link, index) => {
         try {
           const episode = this.parseEpisodeElement(link, groupTitle);
           const existingEpisode = episodeMap.get(episode.url);
-          if (!existingEpisode || (existingEpisode && !existingEpisode.groupTitle && groupTitle)) {
-            episodeMap.set(episode.url, episode);
+          
+          // 既存のエピソードより優先度が高い場合のみ更新
+          if (!existingEpisode || (!existingEpisode.groupTitle && groupTitle)) {
+            episodeMap.set(episode.url, {
+              ...episode,
+              order: groupIndex * 1000 + index  // グループ順とエピソード順を保持
+            });
+            parseSuccessCount++;
           }
         } catch (error) {
           adapterLogger.warn('エピソード要素の解析失敗', {
             error: error instanceof Error ? error.message : 'Unknown error',
-            groupTitle
+            groupTitle,
+            groupIndex,
+            linkIndex: index
           });
         }
       });
     });
 
-    return {
-      workTitle,
-      author,
-      episodes: Array.from(episodeMap.values())
-    };
+    // 解析成功率のログ出力
+    const totalEpisodes = Array.from(episodeGroups)
+      .flatMap(group => this.findEpisodeLinks(group)).length;
+    
+    adapterLogger.info('エピソード解析完了', {
+      totalEpisodes,
+      successCount: parseSuccessCount,
+      successRate: `${(parseSuccessCount / totalEpisodes * 100).toFixed(1)}%`
+    });
+
+    // 順序を保持したまま配列に変換して返却
+    return Array.from(episodeMap.values())
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
 
   private parseEpisodeElement(element: Element, groupTitle?: string): Episode {
