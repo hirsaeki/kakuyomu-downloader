@@ -23,7 +23,17 @@ const proxyHandler: RequestHandler = async (req, res) => {
     const response = await fetch(url);
     const content = await response.text();
     logger.info(`プロキシレスポンス成功: ${url}`);
-    res.send(content);
+    
+    // レスポンスを適切な形式に変換
+    res.json({
+      success: true,
+      data: {
+        content,
+        status: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+          url: response.url
+      }
+    });
     return;
   } catch (error) {
     logger.error('プロキシリクエストエラー', {

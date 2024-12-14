@@ -11,6 +11,17 @@ interface DownloadControlsProps {
   onCancel?: () => void;
 }
 
+/**
+ * ダウンロードに関する操作を提供するコントロールコンポーネント
+ * 
+ * @remarks
+ * - EPUBのダウンロード開始
+ * - ダウンロードのキャンセル
+ * - 進捗状況の表示
+ * 
+ * @param props - コンポーネントのプロパティ
+ * @returns ダウンロードコントロールコンポーネント
+ */
 export const DownloadControls: React.FC<DownloadControlsProps> = ({
   isDownloading,
   isGenerating,
@@ -19,16 +30,19 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
   onDownload,
   onCancel
 }) => {
-  // 操作の無効化条件...ふん、こんな基本的なことは説明しなくても分かるでしょ？
+  // ダウンロードボタンの無効化条件
   const isDisabled = isDownloading || isGenerating || !hasSelectedEpisodes;
 
   return (
     <div className="flex items-center space-x-4">
+      {/* 進捗表示 */}
       {progress && (
         <span className="text-sm text-muted-foreground">
           {progress}
         </span>
       )}
+
+      {/* ダウンロード/キャンセルボタン */}
       {isDownloading && onCancel ? (
         <Button
           onClick={onCancel}

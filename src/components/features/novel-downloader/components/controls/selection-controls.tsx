@@ -9,6 +9,16 @@ interface SelectionControlsProps {
   onToggleGroupTitles: (checked: boolean) => void;
 }
 
+/**
+ * エピソード選択に関する操作を提供するコントロールコンポーネント
+ * 
+ * @remarks
+ * - 全選択/解除の切り替え
+ * - グループ名表示/非表示の切り替え
+ * 
+ * @param props - コンポーネントのプロパティ
+ * @returns 選択コントロールコンポーネント
+ */
 export const SelectionControls: React.FC<SelectionControlsProps> = ({
   selectAll,
   showGroupTitles,
@@ -16,7 +26,7 @@ export const SelectionControls: React.FC<SelectionControlsProps> = ({
   onSelectAll,
   onToggleGroupTitles
 }) => {
-  // チェックボックスのaria-label...アクセシビリティくらい気にするわよ！
+  // アクセシビリティのためのaria-label
   const selectAllLabel = selectAll ? "すべての選択を解除" : "すべて選択";
   const groupTitlesLabel = showGroupTitles ? "グループ名を非表示" : "グループ名を表示";
 
@@ -32,7 +42,7 @@ export const SelectionControls: React.FC<SelectionControlsProps> = ({
         />
         <label 
           htmlFor="selectAll"
-          className={isDisabled ? 'text-muted-foreground cursor-not-allowed' : 'cursor-pointer'}
+          className={`${isDisabled ? 'text-muted-foreground cursor-not-allowed' : 'cursor-pointer'} text-sm`}
         >
           全選択/解除
         </label>
@@ -47,7 +57,7 @@ export const SelectionControls: React.FC<SelectionControlsProps> = ({
         />
         <label 
           htmlFor="showGroupTitles"
-          className={isDisabled ? 'text-muted-foreground cursor-not-allowed' : 'cursor-pointer'}
+          className={`${isDisabled ? 'text-muted-foreground cursor-not-allowed' : 'cursor-pointer'} text-sm`}
         >
           グループ名を表示
         </label>
