@@ -7,10 +7,8 @@ interface URLInputFieldProps {
   url: string;
   onUrlChange: (url: string) => void;
   onFetch: () => void;
-  onClearCache: () => void;
   isLoading: boolean;
   isDisabled: boolean;
-  isClearing: boolean;
   hasWorkTitle: boolean;
   currentAdapter: boolean;
 }
@@ -21,16 +19,13 @@ interface URLInputFieldProps {
  * @remarks
  * - URL入力
  * - エピソード取得
- * - キャッシュクリア
  */
 export const URLInputField: React.FC<URLInputFieldProps> = ({
   url,
   onUrlChange,
   onFetch,
-  onClearCache,
   isLoading,
   isDisabled,
-  isClearing,
   hasWorkTitle,
   currentAdapter
 }) => {
@@ -55,20 +50,6 @@ export const URLInputField: React.FC<URLInputFieldProps> = ({
           </>
         ) : '取得'}
       </Button>
-      {hasWorkTitle && (
-        <Button
-          onClick={onClearCache}
-          variant="outline"
-          disabled={isClearing || isDisabled}
-        >
-          {isClearing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              クリア中...
-            </>
-          ) : 'キャッシュクリア'}
-        </Button>
-      )}
     </div>
   );
 };

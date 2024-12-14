@@ -16,6 +16,8 @@ import { Trash2 } from 'lucide-react';
 interface ClearCacheDialogProps {
   isDisabled?: boolean;
   onClearCache: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
 }
 
 /**
@@ -30,10 +32,12 @@ interface ClearCacheDialogProps {
  */
 export const ClearCacheDialog: React.FC<ClearCacheDialogProps> = ({
   isDisabled = false,
-  onClearCache
+  onClearCache,
+  onOpenChange,
+  open
 }) => {
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"

@@ -6,6 +6,7 @@ import type { EPUBMetadata, InputChapter } from '@/lib/epub/core/types';
 import { createContextLogger } from '@/lib/logger';
 import { type Episode, type EpisodeStatus } from '@/types';
 import type { NovelDownloaderState } from '../types';
+import db from '@/lib/database';
 
 const logger = createContextLogger('novel-downloader-hook');
 
@@ -13,7 +14,7 @@ const logger = createContextLogger('novel-downloader-hook');
  * 小説ダウンロード機能を提供するカスタムフック
  */
 export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
-  // State管理...もう！こんなの朝飯前なんだから！
+  // State管理
   const [state, setState] = useState<NovelDownloaderState>({
     url: '',
     episodes: [],
@@ -36,17 +37,47 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     },
     selectAll: false,
     showGroupTitles: true,
-    showClearDialog: false
+    showClearDialog: false,
+    hasCachedData: false
   });
 
-  // 参照系はそのまま...レート制限は大事よ！
+  // 参照系
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastRequestTimeRef = useRef<number | null>(null);
 
-  // URL変更時のアダプター検出
+  // キャッシュ確認
+  const checkCache = useCallback(async (url: string) => {
+    if (!url) return false;
+    
+    try {
+      const cachedWork = await db.getWork(url);
+      if (cachedWork) {
+        setState(prev => ({
+          ...prev,
+          metadata: {
+            workTitle: cachedWork.workTitle,
+            author: cachedWork.author
+          },
+          hasCachedData: true
+        }));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.error('Cache check failed:', error);
+      return false;
+    }
+  }, []);
+
+  // URL変更時のアダプター検出とキャッシュチェック
   useEffect(() => {
     if (!state.url) {
-      setState(prev => ({ ...prev, currentAdapter: null }));
+      setState(prev => ({
+        ...prev,
+        currentAdapter: null,
+        hasCachedData: false,
+        metadata: { workTitle: '', author: '' }
+      }));
       return;
     }
 
@@ -56,14 +87,22 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
       
       if (!adapter) {
         logger.debug('No compatible adapter found for URL', { url: state.url });
+        return;
       }
+
+      // URL変更時にキャッシュをチェック
+      checkCache(state.url);
     } catch (error) {
       logger.error('Error detecting adapter', error);
-      setState(prev => ({ ...prev, currentAdapter: null, error: 'アダプターの検出に失敗しました' }));
+      setState(prev => ({
+        ...prev,
+        currentAdapter: null,
+        error: 'アダプターの検出に失敗しました'
+      }));
     }
-  }, [state.url, factory]);
+  }, [state.url, factory, checkCache]);
 
-  // 状態更新のヘルパー...使う側のことも考えなきゃね！
+  // 状態更新のヘルパー
   const updateState = useCallback((partial: Partial<NovelDownloaderState>) => {
     setState(prev => ({ ...prev, ...partial }));
   }, []);
@@ -89,7 +128,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     });
   }, [state.downloadStatus, updateState]);
 
-  // URL関連の操作...こんなの基本よ！
+  // URL関連の操作
   const setUrl = useCallback((url: string) => {
     updateState({ url, error: null });
   }, [updateState]);
@@ -114,7 +153,8 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         metadata: {
           workTitle: result.workTitle,
           author: result.author
-        }
+        },
+        hasCachedData: result.fromCache || false
       });
     } catch (error) {
       logger.error('Failed to fetch episodes', error);
@@ -127,7 +167,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     }
   }, [state.url, state.currentAdapter, updateState]);
 
-  // キャッシュ操作...もう！面倒見てあげるわよ！
+  // キャッシュ操作
   const clearCache = useCallback(async () => {
     if (!state.url) return;
 
@@ -137,7 +177,8 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
       updateState({
         episodes: [],
         metadata: { workTitle: '', author: '' },
-        showClearDialog: false
+        showClearDialog: false,
+        hasCachedData: false
       });
     } catch (error) {
       logger.error('Failed to clear cache', error);
@@ -149,7 +190,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     }
   }, [state.url, updateState]);
 
-  // UI表示制御...ユーザー体験が大事なんだから！
+  // UI表示制御
   const setShowGroupTitles = useCallback((show: boolean) => {
     updateState({ showGroupTitles: show });
   }, [updateState]);
@@ -158,7 +199,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     updateState({ showClearDialog: show });
   }, [updateState]);
 
-  // エピソード選択...完璧な実装になってるんだから！
+  // エピソード選択
   const selectAllEpisodes = useCallback((selected: boolean) => {
     updateState({
       selectAll: selected,
@@ -176,7 +217,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     });
   }, [state.episodes, updateState]);
 
-  // ダウンロード処理...これが本命なのよ！
+  // ダウンロード処理
   const downloadEpisodes = useCallback(async () => {
     if (!state.currentAdapter) {
       updateState({ error: 'アダプターが無効です' });
@@ -193,7 +234,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
 
-    // 初期状態の設定...ちゃんとエラーフィールドを追加するわよ！
+    // 初期状態の設定
     const episodeStatuses: Record<string, EpisodeStatus> = {};
     selectedEpisodes.forEach(ep => {
       episodeStatuses[ep.url] = { status: 'pending', error: null };
@@ -226,7 +267,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         const episode = selectedEpisodes[i];
 
         try {
-          // こっちもちゃんとエラーフィールドを追加！
           updateEpisodeStatus(episode.url, { status: 'downloading', error: null });
 
           // レート制限の考慮
@@ -247,17 +287,15 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
             title: result.title || episode.title
           });
 
-          // 完了状態も同様よ！
           updateEpisodeStatus(episode.url, { status: 'completed', error: null });
 
         } catch (error) {
           logger.error(`Episode download failed: ${episode.title}`, error);
-          // エラー状態の更新
           updateEpisodeStatus(episode.url, {
             status: 'error',
             error: error instanceof Error ? error.message : '不明なエラー'
           });
-          throw error;  // 上位でまとめて処理
+          throw error;
         }
       }
 
@@ -269,7 +307,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         throw new Error('ダウンロードに成功したエピソードがありません');
       }
 
-      // EPUB生成...完璧な実装よ！
+      // EPUB生成
       updateState({
         downloadStatus: {
           ...state.downloadStatus,
@@ -294,7 +332,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         tocTitle: '目次',
         lang: 'ja',
         modifiedDate: new Date().toISOString(),
-        content: []  // EPUBGeneratorが自動設定してくれるのよ！
+        content: []
       };
 
       const epubGenerator = new EPUBGenerator();
@@ -302,7 +340,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         aborted: signal.aborted
       });
 
-      // ファイルの保存...ユーザーのことを考えた実装なんだから！
+      // ファイルの保存
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -316,7 +354,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           isDownloading: false,
           isGenerating: false,
           progress: { current: 0, total: 0 },
-          episodes: {},  // 状態をクリア
+          episodes: {},
           message: '完了しました'
         }
       });
@@ -339,7 +377,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           isDownloading: false,
           isGenerating: false,
           progress: { current: 0, total: 0 },
-          episodes: state.downloadStatus.episodes,  // エラー状態は保持
+          episodes: state.downloadStatus.episodes,
           message: undefined
         }
       });
@@ -357,7 +395,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     updateEpisodeStatus
   ]);
 
-  // キャンセル処理...ユーザーの操作は大事にしないとね！
+  // キャンセル処理
   const cancelDownload = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -368,7 +406,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           isDownloading: false,
           isGenerating: false,
           progress: { current: 0, total: 0 },
-          episodes: {},  // キャンセル時は状態をクリア
+          episodes: {},
           message: 'ダウンロードをキャンセルしました'
         }
       });

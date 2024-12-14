@@ -3,11 +3,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BaseNovelSiteAdapter } from '@/adapters';
 import { useNovelDownloader } from '@/features/novel-downloader/hooks/use-novel-downloader';
 import { useAdapterContext } from '@/features/novel-downloader/hooks/use-adapter-context';
-import { ErrorAlert, ProgressAlert, WarningAlert } from './alerts';
+import { ErrorAlert, ProgressAlert } from './alerts';
 import { DownloadControls, SelectionControls, ClearCacheDialog } from './controls';
 import { EpisodeTable } from './episode-table';
 import { URLInputField } from './url-input-field';
 import { WorkInfo } from './work-info';
+import { Info, HelpCircle } from 'lucide-react';
 
 /**
  * Web小説ダウンローダーのメインコンポーネント
@@ -38,6 +39,9 @@ export const NovelDownloader: React.FC = () => {
   // 選択中のエピソードの有無
   const hasSelectedEpisodes = state.episodes.some(ep => ep.selected);
 
+  // 対応サイトの一覧を生成
+  const supportedSites = adapters.map((a: BaseNovelSiteAdapter) => a.siteName).join('、');
+
   return (
     <Card className="w-full max-w-4xl">
       <CardHeader>
@@ -49,36 +53,60 @@ export const NovelDownloader: React.FC = () => {
           {state.error && (
             <ErrorAlert message={state.error} />
           )}
-          {state.url && !state.currentAdapter && (
-            <WarningAlert 
-              message={`対応サイト: ${adapters.map((a: BaseNovelSiteAdapter) => a.siteName).join(', ')}`} 
-            />
-          )}
           {state.downloadStatus.message && (
             <ProgressAlert message={state.downloadStatus.message} />
           )}
 
-          {/* URL入力エリア */}
-          <URLInputField
-            url={state.url}
-            onUrlChange={actions.setUrl}
-            onFetch={actions.fetchEpisodes}
-            onClearCache={() => actions.setShowClearDialog(true)}
-            isLoading={state.loading}
-            isDisabled={isOperationDisabled}
-            isClearing={false}  // この状態は新しい実装では不要になったみたい
-            hasWorkTitle={!!state.metadata.workTitle}
-            currentAdapter={!!state.currentAdapter}
-          />
-
-          {/* 作品情報表示エリア */}
-          {state.currentAdapter && state.metadata.workTitle && (
-            <WorkInfo
-              title={state.metadata.workTitle}
-              author={state.metadata.author}
-              adapterName={state.currentAdapter.siteName}
+          {/* URL入力エリアと作品情報 */}
+          <div className="space-y-2">
+            <URLInputField
+              url={state.url}
+              onUrlChange={actions.setUrl}
+              onFetch={actions.fetchEpisodes}
+              isLoading={state.loading}
+              isDisabled={isOperationDisabled}
+              hasWorkTitle={!!state.metadata.workTitle}
+              currentAdapter={!!state.currentAdapter}
             />
-          )}
+            
+            {/* URLの対応状況表示 */}
+            {state.url && (
+              <div className="flex items-center text-sm text-muted-foreground">
+                {state.currentAdapter ? (
+                  <>
+                    <Info className="h-4 w-4 mr-2 text-blue-500" />
+                    {!state.metadata.workTitle ? (
+                      <span>{state.currentAdapter.siteName}の作品URLを検出しました。「取得」ボタンをクリックして作品情報を取得できます。</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <HelpCircle className="h-4 w-4 mr-2 text-orange-500" />
+                    <span>現在は{supportedSites}に対応しています。対応サイトの作品URLを入力してください。</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* 作品情報とキャッシュクリア */}
+            {state.currentAdapter && state.metadata.workTitle && (
+              <div className="flex justify-between items-start">
+                <WorkInfo
+                  title={state.metadata.workTitle}
+                  author={state.metadata.author}
+                  adapterName={state.currentAdapter.siteName}
+                />
+                {state.hasCachedData && (
+                  <ClearCacheDialog
+                    isDisabled={isOperationDisabled}
+                    onClearCache={actions.clearCache}
+                    onOpenChange={actions.setShowClearDialog}
+                    open={state.showClearDialog}
+                  />
+                )}
+              </div>
+            )}
+          </div>
 
           {/* エピソード管理エリア */}
           {state.episodes.length > 0 && (
@@ -110,12 +138,6 @@ export const NovelDownloader: React.FC = () => {
             </>
           )}
         </div>
-
-        {/* キャッシュクリアダイアログ */}
-        <ClearCacheDialog
-          isDisabled={isOperationDisabled}
-          onClearCache={actions.clearCache}
-        />
       </CardContent>
     </Card>
   );
