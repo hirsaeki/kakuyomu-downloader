@@ -9,6 +9,16 @@ const PORT = process.env.PORT ?? 3000;
 
 app.use(cors());
 
+// プロキシ設定
+// CORSに必要なヘッダーセット
+const ALLOWED_HEADERS = [
+  'Content-Type',
+  'Content-Length',
+  'Last-Modified',
+  'ETag',
+  'Cache-Control'
+];
+
 const proxyHandler: RequestHandler = async (req, res) => {
   const { url } = req.query;
 
@@ -21,20 +31,28 @@ const proxyHandler: RequestHandler = async (req, res) => {
   try {
     logger.info(`プロキシリクエスト: ${url}`);
     const response = await fetch(url);
-    const content = await response.text();
-    logger.info(`プロキシレスポンス成功: ${url}`);
-    
-    // レスポンスを適切な形式に変換
-    res.json({
-      success: true,
-      data: {
-        content,
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-          url: response.url
+
+    // オリジナルのレスポンスヘッダーを転送（許可されたものだけ）
+    ALLOWED_HEADERS.forEach(header => {
+      const value = response.headers.get(header);
+      if (value) {
+        res.setHeader(header, value);
       }
     });
+
+    // レスポンスステータスを設定
+    res.status(response.status);
+
+    // ボディを直接転送
+    const content = await response.text();
+    res.send(content);
+
+    logger.info(`プロキシレスポンス成功: ${url}`, {
+      status: response.status,
+      contentType: response.headers.get('Content-Type')
+    });
     return;
+
   } catch (error) {
     logger.error('プロキシリクエストエラー', {
       url,
