@@ -116,19 +116,23 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     });
   }, [state.downloadStatus, updateState]);
 
-  //old code
-  const updateEpisodeStatus = useCallback((url: string, status: EpisodeStatus) => {
-    updateState({
+  const updateEpisodeStatus = useCallback(async (workUrl: string, episodeId: string, status: EpisodeStatus) => {
+    updateState({  // UIの状態を更新
       downloadStatus: {
         ...state.downloadStatus,
         episodes: {
           ...state.downloadStatus.episodes,
-          [url]: status
+          [episodeId]: status  // episodeIdをキーとして使用
         }
       }
     });
+
+    try {
+      await db.updateEpisodeStatus(workUrl, episodeId, status);
+    } catch (error) {
+      logger.error('Failed to update episode status:', error);
+    }      
   }, [state.downloadStatus, updateState]);
-  //old code end
 
   // URL関連の操作
   const setUrl = useCallback((url: string) => {
@@ -269,7 +273,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         const episode = selectedEpisodes[i];
 
         try {
-          updateEpisodeStatus(episode.url, { status: 'downloading', error: null });
+          updateEpisodeStatus(state.url, episode.url, { status: 'downloading', error: null });
 
           // レート制限の考慮
           const waitTime = getWaitTime(lastRequestTimeRef.current);
@@ -294,11 +298,11 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
             title: result.title || episode.title
           });
 
-          updateEpisodeStatus(episode.url, { status: 'completed', error: null });
+          updateEpisodeStatus(state.url, episode.url, { status: 'completed', error: null });
 
         } catch (error) {
           logger.error(`Episode download failed: ${episode.title}`, error);
-          updateEpisodeStatus(episode.url, {
+          updateEpisodeStatus(state.url,episode.url, {
             status: 'error',
             error: error instanceof Error ? error.message : '不明なエラー'
           });

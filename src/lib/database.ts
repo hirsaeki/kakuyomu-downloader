@@ -27,15 +27,8 @@ class NovelDatabase extends Dexie implements INovelDatabase {
     // バージョンアップはCONFIG.DATABASE.VERSIONを使用して定数管理
     this.version(CACHE_CONFIG.DATABASE.VERSION + 1).stores({
       works: '&url, workTitle, author, lastAccessed, lastModified',
-      episodes: '[workUrl+id], workUrl, lastAccessed, lastModified',
+      episodes: 'id, workUrl, lastAccessed, lastModified, [workUrl+id]',  // ←変更
       contents: '&episodeUrl, lastAccessed, lastModified'
-    }).upgrade(tx => {
-      // 既存のエピソードにstatusを追加
-      return tx.table('episodes').toCollection().modify(episode => {
-        if (!episode.status) {
-          episode.status = { status: 'pending', error: null };
-        }
-      });
     });
   }
 
@@ -97,24 +90,17 @@ class NovelDatabase extends Dexie implements INovelDatabase {
 
   async updateEpisodeStatus(workUrl: string, episodeId: string, status: EpisodeStatus): Promise<void> {
     try {
-      await this.transaction('rw', this.episodes, async () => {
-        const episode = await this.episodes
-          .where('[workUrl+id]')
-          .equals([workUrl, episodeId])
-          .first();
+      const count = await this.episodes
+        .where('[workUrl+id]')
+        .equals([workUrl, episodeId])
+        .modify(episode => {
+          episode.status = status;
+          episode.lastModified = new Date();
+        });
 
-        if (!episode) {
-          throw new ValidationError('エピソードが見つかりません');
-        }
-
-        await this.episodes.update(
-          [workUrl, episodeId],
-          { 
-            status,
-            lastModified: new Date()
-          }
-        );
-      });
+      if (count === 0) {
+        throw new ValidationError('エピソードが見つかりません');
+      }
     } catch (error) {
       if (error instanceof ValidationError) {
         throw error;
@@ -195,7 +181,8 @@ class NovelDatabase extends Dexie implements INovelDatabase {
             await this.episodes.bulkPut(
               batch.map(ep => ({
                 ...ep,
-                lastAccessed: now
+                lastAccessed: now,
+                status: ep.status || { status: 'pending', error: null }  // ステータスを維持
               }))
             );
           }

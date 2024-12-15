@@ -14,6 +14,7 @@ function convertToEpisodeRecord(episode: Episode, workUrl: string, index: number
   const now = new Date();
   return {
     ...episode,
+    id: episode.id,
     workUrl,
     lastAccessed: now,
     lastModified: now,
