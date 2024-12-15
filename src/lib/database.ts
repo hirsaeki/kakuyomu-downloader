@@ -6,6 +6,7 @@ import {
   EpisodeRecord,
   ContentRecord,
   INovelDatabase,
+  EpisodeStatus
 } from '@/types';
 import {
   DatabaseError,
@@ -23,10 +24,18 @@ class NovelDatabase extends Dexie implements INovelDatabase {
   constructor() {
     super(CACHE_CONFIG.DATABASE.NAME);
 
-    this.version(CACHE_CONFIG.DATABASE.VERSION).stores({
+    // バージョンアップはCONFIG.DATABASE.VERSIONを使用して定数管理
+    this.version(CACHE_CONFIG.DATABASE.VERSION + 1).stores({
       works: '&url, workTitle, author, lastAccessed, lastModified',
       episodes: '[workUrl+id], workUrl, lastAccessed, lastModified',
       contents: '&episodeUrl, lastAccessed, lastModified'
+    }).upgrade(tx => {
+      // 既存のエピソードにstatusを追加
+      return tx.table('episodes').toCollection().modify(episode => {
+        if (!episode.status) {
+          episode.status = { status: 'pending', error: null };
+        }
+      });
     });
   }
 
@@ -64,7 +73,8 @@ class NovelDatabase extends Dexie implements INovelDatabase {
         ...episode,
         workUrl,
         lastAccessed: now,
-        lastModified: now
+        lastModified: now,
+        status: episode.status || { status: 'pending', error: null }  // デフォルトのstatus
       }));
 
       await this.transaction('rw', [this.works, this.episodes], async () => {
@@ -85,10 +95,39 @@ class NovelDatabase extends Dexie implements INovelDatabase {
     }
   }
 
+  async updateEpisodeStatus(workUrl: string, episodeId: string, status: EpisodeStatus): Promise<void> {
+    try {
+      await this.transaction('rw', this.episodes, async () => {
+        const episode = await this.episodes
+          .where('[workUrl+id]')
+          .equals([workUrl, episodeId])
+          .first();
+
+        if (!episode) {
+          throw new ValidationError('エピソードが見つかりません');
+        }
+
+        await this.episodes.update(
+          [workUrl, episodeId],
+          { 
+            status,
+            lastModified: new Date()
+          }
+        );
+      });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      dbLogger.error('エピソード状態更新エラー:', error);
+      throw new DatabaseError('エピソード状態の更新に失敗しました');
+    }
+  }
+
   async saveContent(episodeUrl: string, title: string, content: string): Promise<void> {
     try {
       const now = new Date();
-      // Calculate hash outside of transaction
+      // トランザクション外でハッシュ計算
       const contentHash = await this.calculateContentHash(content);
 
       await this.transaction('rw', this.contents, async () => {
@@ -193,7 +232,7 @@ class NovelDatabase extends Dexie implements INovelDatabase {
     try {
       let episodeUrls: string[] = [];
 
-      // First collect all episode URLs outside the transaction
+      // トランザクション外でURLを収集
       await this.transaction('r', this.episodes, async () => {
         const episodes = await this.episodes
           .where('workUrl')
@@ -202,7 +241,7 @@ class NovelDatabase extends Dexie implements INovelDatabase {
         episodeUrls = episodes.map(e => e.url).filter(Boolean) as string[];
       });
 
-      // Then perform the deletion in a separate transaction
+      // 別トランザクションで削除を実行
       await this.transaction('rw', [this.works, this.episodes, this.contents], async () => {
         await Promise.all([
           this.contents.where('episodeUrl').anyOf(episodeUrls).delete(),
@@ -222,7 +261,7 @@ class NovelDatabase extends Dexie implements INovelDatabase {
       let workUrls: string[] = [];
       let episodeUrls: string[] = [];
 
-      // First collect all URLs that need to be deleted
+      // 削除対象のURL収集
       await this.transaction('r', [this.works, this.episodes], async () => {
         const oldWorks = await this.works
           .where('lastAccessed')
@@ -242,13 +281,13 @@ class NovelDatabase extends Dexie implements INovelDatabase {
 
       if (workUrls.length === 0) return;
 
-      // Calculate cache size outside transaction
+      // トランザクション外でキャッシュサイズ計算
       const totalSize = await this.calculateCacheSize();
       if (totalSize > CACHE_CONFIG.MAX_CACHE_SIZE * 1024 * 1024) {
         dbLogger.info(`キャッシュサイズが上限(${CACHE_CONFIG.MAX_CACHE_SIZE}MB)を超えています`);
       }
 
-      // Perform deletions in a separate transaction
+      // 別トランザクションで削除実行
       await this.transaction('rw', [this.works, this.episodes, this.contents], async () => {
         await Promise.all([
           this.contents.where('episodeUrl').anyOf(episodeUrls).delete(),
@@ -273,7 +312,7 @@ class NovelDatabase extends Dexie implements INovelDatabase {
   private async calculateCacheSize(): Promise<number> {
     try {
       let totalSize = 0;
-      // Read contents in batches to avoid memory issues
+      // バッチ処理でメモリ使用量を抑制
       await this.transaction('r', this.contents, async () => {
         await this.contents.each(record => {
           totalSize += new Blob([record.content]).size;
@@ -289,7 +328,7 @@ class NovelDatabase extends Dexie implements INovelDatabase {
 
 const db = new NovelDatabase();
 
-// Cleanup old cache on initialization
+// 初期化時に古いキャッシュをクリーンアップ
 db.cleanOldCache().catch((error: unknown) => {
   dbLogger.error('キャッシュのクリーンアップに失敗しました', error);
 });

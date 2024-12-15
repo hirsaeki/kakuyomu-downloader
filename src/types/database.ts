@@ -1,4 +1,4 @@
-import { Episode, Work } from './common';
+import { Episode, Work, EpisodeStatus } from './common';
 import { Table } from 'dexie';
 
 export interface WorkRecord {
@@ -14,6 +14,7 @@ export interface EpisodeRecord extends Omit<Episode, 'selected'> {
   order: number;
   lastAccessed: Date;
   lastModified: Date;
+  status?: EpisodeStatus;  // ← 追加
 }
 
 export interface ContentRecord {
@@ -39,4 +40,7 @@ export interface INovelDatabase {
   
   clearWorkCache(workUrl: string): Promise<void>;
   cleanOldCache(maxAgeInDays?: number): Promise<void>;
+
+  // 追加: エピソードの状態を更新する関数
+  updateEpisodeStatus(workUrl: string, episodeId: string, status: EpisodeStatus): Promise<void>;
 }

@@ -116,6 +116,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     });
   }, [state.downloadStatus, updateState]);
 
+  //old code
   const updateEpisodeStatus = useCallback((url: string, status: EpisodeStatus) => {
     updateState({
       downloadStatus: {
@@ -127,6 +128,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
       }
     });
   }, [state.downloadStatus, updateState]);
+  //old code end
 
   // URL関連の操作
   const setUrl = useCallback((url: string) => {
@@ -275,7 +277,12 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
             await sleep(waitTime);
           }
 
-          const result = await fetchEpisodeWithCache(state.currentAdapter, episode.url);
+          const result = await fetchEpisodeWithCache(
+            state.currentAdapter,
+            state.url,
+            episode.id,
+            episode.url
+          );
 
           if (!result.fromCache) {
             lastRequestTimeRef.current = Date.now();
@@ -390,6 +397,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     state.downloadStatus,
     state.showGroupTitles,
     state.metadata,
+    state.url,
     updateState,
     updateDownloadProgress,
     updateEpisodeStatus
