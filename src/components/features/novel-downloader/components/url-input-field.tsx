@@ -9,7 +9,6 @@ interface URLInputFieldProps {
   onFetch: () => void;
   isLoading: boolean;
   isDisabled: boolean;
-  hasWorkTitle: boolean;
   currentAdapter: boolean;
 }
 
@@ -26,7 +25,6 @@ export const URLInputField: React.FC<URLInputFieldProps> = ({
   onFetch,
   isLoading,
   isDisabled,
-  hasWorkTitle,
   currentAdapter
 }) => {
   return (

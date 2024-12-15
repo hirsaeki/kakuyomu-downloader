@@ -96,8 +96,8 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
         throw new NetworkError('コンテンツの取得に失敗しました', true);
       }
 
-      // HTMLの妥当性検証
-      const doc = this.validateHtmlContent(content, normalizedUrl);
+      // HTML文字列をパース（基本的な検証はfetch-client側で実施済み）
+      const doc = new DOMParser().parseFromString(content, 'text/html');
       const { workTitle, author, episodes } = this.parseWorkInfo(doc);
 
       adapterLogger.info('エピソードリスト取得成功', {
@@ -156,8 +156,8 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
         throw new NetworkError('コンテンツの取得に失敗しました', true);
       }
 
-      // HTMLの妥当性検証
-      const doc = this.validateHtmlContent(content, normalizedUrl);
+      // HTML文字列をパース（基本的な検証はfetch-client側で実施済み）
+      const doc = new DOMParser().parseFromString(content, 'text/html');
       const { title, content: parsedContent } = this.parseEpisodeContent(doc);
 
       adapterLogger.info('エピソード内容取得成功', {
@@ -252,82 +252,28 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
   }
 
-  private validateHtmlContent(content: string, url: string): Document {
-    // 空文字チェック
-    if (!content?.trim()) {
-      adapterLogger.error('コンテンツが空', { url });
-      throw new AppError('取得したコンテンツが空です', 'PARSER_ERROR');
-    }
-
-    // HTMLとしてパース
-    const doc = new DOMParser().parseFromString(content, 'text/html');
-
-    // パースエラーのチェック
-    const parseError = doc.querySelector('parsererror');
-    if (parseError) {
-      adapterLogger.error('HTMLパースエラー', { 
-        url,
-        error: parseError.textContent 
-      });
-      throw new AppError('HTMLの解析に失敗しました', 'PARSER_ERROR');
-    }
-
-    // 基本構造の検証
-    if (!doc.documentElement || !doc.body) {
-      adapterLogger.error('不正なHTML構造', { url });
-      throw new AppError('不正なHTML形式です', 'PARSER_ERROR');
-    }
-
-    // カクヨム特有の構造チェック
-    const expectedSelectors = [
-      { selector: KakuyomuAdapter.SELECTORS.TITLE, name: 'タイトル' },
-      { selector: KakuyomuAdapter.SELECTORS.AUTHOR, name: '著者名' }
-    ];
-
-    for (const { selector, name } of expectedSelectors) {
-      const element = doc.querySelector(selector);
-      if (!element) {
-        adapterLogger.error(`${name}要素が見つかりません`, { url, selector });
-        throw new AppError(
-          `カクヨムの作品ページとして必要な${name}要素が見つかりません`,
-          'PARSER_ERROR'
-        );
-      }
-
-      adapterLogger.debug(`${name}要素を検出`, { 
-        url, 
-        selector,
-        content: element.textContent?.trim() 
-      });
-    }
-
-    // メインコンテンツ領域の存在チェック
-    const mainContent = Array.from(doc.getElementsByTagName('div'))
-      .some(el => Array.from(el.classList)
-        .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.GROUP)));
-
-    if (!mainContent) {
-      adapterLogger.error('メインコンテンツが見つかりません', { url });
-      throw new AppError(
-        'カクヨムの作品ページとして必要なコンテンツが見つかりません',
-        'PARSER_ERROR'
-      );
-    }
-
-    return doc;
-  }
-
   private parseWorkInfo(doc: Document): { workTitle: string; author: string; episodes: Episode[] } {
-    // validateHtmlContent でチェック済みなので、non-null assertionを使用
+    // タイトル要素のチェック
     const titleElement = doc.querySelector(KakuyomuAdapter.SELECTORS.TITLE);
-    const authorElement = doc.querySelector(KakuyomuAdapter.SELECTORS.AUTHOR);
-
-    if (!titleElement || !authorElement) {
-      throw new AppError('必須要素が見つかりません（これは起きないはずです）', 'PARSER_ERROR');
+    if (!titleElement?.textContent?.trim()) {
+      adapterLogger.error('タイトル要素が不在または空');
+      throw new AppError('タイトルが見つかりません', 'PARSER_ERROR');
     }
+
+    // 著者要素のチェック
+    const authorElement = doc.querySelector(KakuyomuAdapter.SELECTORS.AUTHOR);
+    if (!authorElement?.textContent?.trim()) {
+      adapterLogger.error('著者名要素が不在または空');
+      throw new AppError('著者名が見つかりません', 'PARSER_ERROR');
+    }
+
+    adapterLogger.debug('基本情報を検出', {
+      title: titleElement.textContent.trim(),
+      author: authorElement.textContent.trim()
+    });
     
-    const workTitle = titleElement.textContent?.trim() ?? '';
-    const author = authorElement.textContent?.trim() ?? '';
+    const workTitle = titleElement.textContent.trim();
+    const author = authorElement.textContent.trim();
 
     // エピソードの解析
     const episodes = this.parseEpisodes(doc);
@@ -342,19 +288,32 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
   }
 
   private findEpisodeLinks(group: Element): Element[] {
-    return Array.from(group.getElementsByTagName('a'))
+    const links = Array.from(group.getElementsByTagName('a'))
       .filter(el => Array.from(el.classList)
         .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.EPISODE_LINK)));
+
+    adapterLogger.debug('エピソードリンク検出', {
+      groupId: group.id,
+      linkCount: links.length
+    });
+
+    return links;
   }
 
   private parseEpisodes(doc: Document): Episode[] {
     const episodeMap = new Map<string, Episode>();
     let parseSuccessCount = 0;
 
-    // エピソードグループの取得（validateHtmlContent でチェック済み）
+    // エピソードグループの取得
     const episodeGroups = Array.from(doc.getElementsByTagName('div'))
       .filter(el => Array.from(el.classList)
         .some(className => className.startsWith(KakuyomuAdapter.CLASS_PREFIX.GROUP)));
+
+    // メインコンテンツ領域の存在チェック
+    if (episodeGroups.length === 0) {
+      adapterLogger.error('メインコンテンツが不在');
+      throw new AppError('コンテンツ領域が見つかりません', 'PARSER_ERROR');
+    }
 
     episodeGroups.forEach((group, groupIndex) => {
       const groupTitle = group.querySelector('h3, h4')?.textContent?.trim();
@@ -404,10 +363,10 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     return Array.from(episodeMap.values())
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
-
   private parseEpisodeElement(element: Element, groupTitle?: string): Episode {
     const href = element.getAttribute('href');
     if (!href) {
+      adapterLogger.error('エピソードURLが不在');
       throw new AppError('エピソードのURLが見つかりません', 'PARSER_ERROR');
     }
 
@@ -417,15 +376,31 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
 
     const dateElement = element.querySelector('time');
 
-    if (!titleElement || !dateElement) {
-      adapterLogger.error('エピソード要素の必須要素が不足', { href });
-      throw new AppError('エピソードの必須要素が見つかりません', 'PARSER_ERROR');
+    if (!titleElement?.textContent?.trim()) {
+      adapterLogger.error('エピソードタイトルが不在または空', { href });
+      throw new AppError('エピソードのタイトルが見つかりません', 'PARSER_ERROR');
+    }
+
+    if (!dateElement?.getAttribute('datetime')) {
+      adapterLogger.error('エピソード日時が不在', {
+        href,
+        title: titleElement.textContent.trim()
+      });
+      throw new AppError('エピソードの公開日時が見つかりません', 'PARSER_ERROR');
     }
 
     const episodeId = href.split('/').pop() ?? 'unknown';
     const episodeUrl = `https://kakuyomu.jp${href}`;
-    const episodeTitle = titleElement.textContent?.trim() ?? '';
+    const episodeTitle = titleElement.textContent.trim();
     const datetime = dateElement.getAttribute('datetime') ?? '';
+
+    adapterLogger.debug('エピソード要素解析完了', {
+      id: episodeId,
+      title: episodeTitle,
+      url: episodeUrl,
+      date: datetime,
+      groupTitle
+    });
 
     return {
       id: episodeId,
@@ -438,22 +413,30 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
   }
 
   private parseEpisodeContent(doc: Document): { title: string; content: string } {
+    // タイトル要素のチェック
     const titleElement = doc.querySelector(KakuyomuAdapter.SELECTORS.CONTENT_TITLE);
-    const contentElement = doc.querySelector(KakuyomuAdapter.SELECTORS.EPISODE_CONTENT);
-
     if (!titleElement?.textContent?.trim()) {
-      adapterLogger.error('エピソードタイトルが不在');
+      adapterLogger.error('エピソードタイトルが不在または空');
       throw new AppError('エピソードタイトルが見つかりません', 'PARSER_ERROR');
     }
 
-    if (!contentElement) {
-      adapterLogger.error('エピソード本文が不在');
+    // 本文要素のチェック
+    const contentElement = doc.querySelector(KakuyomuAdapter.SELECTORS.EPISODE_CONTENT);
+    if (!contentElement?.innerHTML?.trim()) {
+      adapterLogger.error('エピソード本文が不在または空', {
+        title: titleElement.textContent.trim()
+      });
       throw new AppError('本文が見つかりません', 'PARSER_ERROR');
     }
 
-    return {
-      title: titleElement.textContent.trim(),
-      content: contentElement.innerHTML.trim()
-    };
+    const title = titleElement.textContent.trim();
+    const content = contentElement.innerHTML.trim();
+
+    adapterLogger.debug('エピソード内容解析完了', {
+      title,
+      contentLength: content.length
+    });
+
+    return { title, content };
   }
 }

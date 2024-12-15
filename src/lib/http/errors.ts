@@ -1,22 +1,6 @@
 import { NetworkError, ValidationError } from '@/lib/errors';
 import { HttpClientError } from './types';
 
-interface ApiErrorResponse {
-  success: false;
-  error: {
-    message: string;
-    statusCode?: number;
-    type?: string;
-  };
-}
-
-interface ApiSuccessResponse<T> {
-  success: true;
-  data: T;
-}
-
-type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
-
 /**
  * HTTPエラーをアプリケーションエラーに変換する
  */
@@ -56,26 +40,4 @@ export function convertHttpError(error: HttpClientError): NetworkError | Validat
     error.message || '不明なエラーが発生しました',
     false
   );
-}
-
-/**
- * レスポンスの型が正しいか検証
- */
-export function validateResponse<T>(response: unknown): asserts response is ApiResponse<T> {
-  if (!response || typeof response !== 'object') {
-    throw new ValidationError('不正なレスポンス形式です');
-  }
-
-  if (!('success' in response)) {
-    throw new ValidationError('レスポンスにsuccess フィールドがありません');
-  }
-
-  const typedResponse = response as ApiResponse<T>;
-  
-  if (!typedResponse.success && typedResponse.error) {
-    throw new HttpClientError(
-      typedResponse.error.message || '不明なエラー',
-      typedResponse.error.statusCode
-    );
-  }
 }

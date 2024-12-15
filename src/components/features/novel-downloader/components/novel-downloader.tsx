@@ -65,7 +65,6 @@ export const NovelDownloader: React.FC = () => {
               onFetch={actions.fetchEpisodes}
               isLoading={state.loading}
               isDisabled={isOperationDisabled}
-              hasWorkTitle={!!state.metadata.workTitle}
               currentAdapter={!!state.currentAdapter}
             />
             

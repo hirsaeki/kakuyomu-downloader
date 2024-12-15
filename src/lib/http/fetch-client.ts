@@ -1,5 +1,7 @@
 import { HttpClient, HttpClientConfig, HttpClientError, HttpResponse, ProxyConfig } from './types';
-import { validateResponse } from './errors';
+import { convertHttpError } from './errors';
+import { NetworkError } from '@/lib/errors';
+import { validateResponse, validateHtmlContent } from './validation';
 import { NETWORK_CONFIG } from '@/config/constants';
 import { createContextLogger } from '@/lib/logger';
 
@@ -127,19 +129,34 @@ export class FetchHttpClient implements HttpClient {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
         if (error instanceof HttpClientError) {
+          const appError = convertHttpError(error);
+
           if (this.isRetryableError(error) && attempt < maxAttempts - 1) {
             httpLogger.warn('リトライ可能なエラーが発生', {
               attempt: attempt + 1,
               maxAttempts,
-              error: error.message,
+              error: appError.message,
               status: error.status,
               url
             });
             await this.delay(attempt);
             continue;
           }
+
+          httpLogger.error('HTTPエラー', {
+            attempt: attempt + 1,
+            error: {
+              name: appError.name,
+              message: appError.message,
+              retriable: appError instanceof NetworkError && appError.retriable,
+              status: error.status
+            },
+            url
+          });
+          throw appError;
         }
-        httpLogger.error('リクエスト失敗', {
+
+        httpLogger.error('予期しないエラー', {
           attempt: attempt + 1,
           error: error instanceof Error ? {
             name: error.name,
@@ -157,7 +174,9 @@ export class FetchHttpClient implements HttpClient {
       url,
       error: lastError
     });
-    throw lastError || new HttpClientError('Max retry attempts exceeded');
+    
+    const finalError = new HttpClientError('Max retry attempts exceeded');
+    throw convertHttpError(finalError);
   }
 
   /**
@@ -214,6 +233,9 @@ export class FetchHttpClient implements HttpClient {
         if (error.name === 'AbortError') {
           throw new HttpClientError('Request timeout', undefined, error);
         }
+        if (error instanceof HttpClientError) {
+          throw error;
+        }
         throw new HttpClientError(
           error.message,
           undefined,
@@ -239,6 +261,11 @@ export class FetchHttpClient implements HttpClient {
 
     if (contentType?.includes('text/')) {
       const text = await response.text();
+      if (contentType.includes('text/html')) {
+        // HTML特有の基本的なバリデーションを実行
+        httpLogger.debug('HTMLコンテンツの基本検証を実行');
+        validateHtmlContent(text);
+      }
       return text as unknown as T;
     }
 
