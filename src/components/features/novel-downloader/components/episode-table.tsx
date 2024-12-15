@@ -9,13 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { type Episode, type EpisodeStatus } from '@/types/common';
+import { type Episode } from '@/types';
 
 // ステータスインジケーターコンポーネント
-const StatusIndicator: React.FC<{ status?: EpisodeStatus }> = ({ status }) => {
-  if (!status) return <span aria-label="未取得">－</span>;
-
-  switch (status.status) {
+const StatusIndicator: React.FC<{ episode: Episode }> = ({ episode }) => {
+  switch (episode.status.status) {
     case 'downloading':
       return <span aria-label="取得中">⏳ 取得中</span>;
     case 'completed':
@@ -24,9 +22,9 @@ const StatusIndicator: React.FC<{ status?: EpisodeStatus }> = ({ status }) => {
       return (
         <div>
           <span aria-label="エラー">❌ エラー</span>
-          {status.error && (
-            <div className="text-xs text-red-500" title={status.error}>
-              {status.error}
+          {episode.status.error && (
+            <div className="text-xs text-red-500" title={episode.status.error}>
+              {episode.status.error}
             </div>
           )}
         </div>
@@ -50,7 +48,6 @@ const TableColumns = () => (
 
 export interface EpisodeTableProps {
   episodes: Episode[];
-  downloadStatus: Record<string, EpisodeStatus>;
   showGroupTitles: boolean;
   onSelectEpisode: (url: string, selected: boolean) => void;
   className?: string;
@@ -58,7 +55,6 @@ export interface EpisodeTableProps {
 
 export const EpisodeTable: React.FC<EpisodeTableProps> = ({
   episodes,
-  downloadStatus,
   showGroupTitles,
   onSelectEpisode,
   className
@@ -71,8 +67,7 @@ export const EpisodeTable: React.FC<EpisodeTableProps> = ({
         <TableColumns />
         <TableBody>
           {episodes.map((episode) => {
-            const status = downloadStatus[episode.url];
-            const isDownloading = status?.status === 'downloading';
+            const isDownloading = episode.status.status === 'downloading';
 
             return (
               <TableRow key={episode.url}>
@@ -99,7 +94,7 @@ export const EpisodeTable: React.FC<EpisodeTableProps> = ({
                   {episode.date ? new Date(episode.date).toLocaleDateString('ja-JP') : ''}
                 </TableCell>
                 <TableCell className="text-center">
-                  <StatusIndicator status={status} />
+                  <StatusIndicator episode={episode} />
                 </TableCell>
               </TableRow>
             );

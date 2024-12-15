@@ -9,12 +9,12 @@ export interface WorkRecord {
   lastModified: Date;
 }
 
-export interface EpisodeRecord extends Omit<Episode, 'selected'> {
+export interface EpisodeRecord extends Omit<Episode, 'selected' | 'status'> {
   workUrl: string;
   order: number;
   lastAccessed: Date;
   lastModified: Date;
-  status?: EpisodeStatus;  // ← 追加
+  status: EpisodeStatus;  // 必須に変更
 }
 
 export interface ContentRecord {

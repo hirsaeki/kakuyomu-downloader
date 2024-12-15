@@ -1,5 +1,5 @@
 import { BaseNovelSiteAdapter } from '@/adapters';
-import { Episode, EpisodeStatus } from '@/types';
+import { Episode } from '@/types';
 
 export interface NovelDownloaderState {
   url: string;
@@ -18,11 +18,10 @@ export interface NovelDownloaderState {
       current: number;
       total: number;
     };
-    episodes: Record<string, EpisodeStatus>;
     message?: string;
   };
   selectAll: boolean;
   showGroupTitles: boolean;
   showClearDialog: boolean;
-  hasCachedData: boolean;  // 追加: キャッシュの有無を表す状態
-};
+  hasCachedData: boolean;
+}

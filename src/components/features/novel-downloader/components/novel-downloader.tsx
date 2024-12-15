@@ -130,9 +130,9 @@ export const NovelDownloader: React.FC = () => {
 
               <EpisodeTable
                 episodes={state.episodes}
-                downloadStatus={state.downloadStatus.episodes}
                 showGroupTitles={state.showGroupTitles}
                 onSelectEpisode={actions.selectEpisode}
+                className="mt-4"
               />
             </>
           )}

@@ -32,7 +32,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         current: 0,
         total: 0
       },
-      episodes: {},
       message: undefined
     },
     selectAll: false,
@@ -117,22 +116,21 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
   }, [state.downloadStatus, updateState]);
 
   const updateEpisodeStatus = useCallback(async (workUrl: string, episodeId: string, status: EpisodeStatus) => {
-    updateState({  // UIの状態を更新
-      downloadStatus: {
-        ...state.downloadStatus,
-        episodes: {
-          ...state.downloadStatus.episodes,
-          [episodeId]: status  // episodeIdをキーとして使用
-        }
-      }
-    });
-
+    setState(prev => ({
+      ...prev,
+      episodes: prev.episodes.map(ep =>
+        ep.id === episodeId
+          ? { ...ep, status }
+          : ep
+      )
+    }));
+    
     try {
       await db.updateEpisodeStatus(workUrl, episodeId, status);
     } catch (error) {
       logger.error('Failed to update episode status:', error);
-    }      
-  }, [state.downloadStatus, updateState]);
+    }
+  }, []);
 
   // URL関連の操作
   const setUrl = useCallback((url: string) => {
@@ -154,8 +152,19 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
 
     try {
       const result = await fetchWorkWithCache(state.currentAdapter, state.url);
+      
+      // データベースからエピソードのステータスを取得
+      const dbEpisodes = await db.getEpisodes(state.url);
+      const episodeStatusMap = new Map(
+        dbEpisodes.map(ep => [ep.id, ep.status || { status: 'pending', error: null }])
+      );
+
       updateState({
-        episodes: result.episodes.map(ep => ({ ...ep, selected: false })),
+        episodes: result.episodes.map(ep => ({
+          ...ep,
+          selected: false,
+          status: episodeStatusMap.get(ep.id) || { status: 'pending', error: null }
+        })),
         metadata: {
           workTitle: result.workTitle,
           author: result.author
@@ -241,11 +250,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     const { signal } = abortControllerRef.current;
 
     // 初期状態の設定
-    const episodeStatuses: Record<string, EpisodeStatus> = {};
-    selectedEpisodes.forEach(ep => {
-      episodeStatuses[ep.url] = { status: 'pending', error: null };
-    });
-
     updateState({
       downloadStatus: {
         isDownloading: true,
@@ -254,7 +258,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           current: 0,
           total: selectedEpisodes.length
         },
-        episodes: episodeStatuses,
         message: undefined
       },
       error: null
@@ -273,7 +276,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         const episode = selectedEpisodes[i];
 
         try {
-          updateEpisodeStatus(state.url, episode.url, { status: 'downloading', error: null });
+          await updateEpisodeStatus(state.url, episode.url, { status: 'downloading', error: null });
 
           // レート制限の考慮
           const waitTime = getWaitTime(lastRequestTimeRef.current);
@@ -298,11 +301,11 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
             title: result.title || episode.title
           });
 
-          updateEpisodeStatus(state.url, episode.url, { status: 'completed', error: null });
+          await updateEpisodeStatus(state.url, episode.url, { status: 'completed', error: null });
 
         } catch (error) {
           logger.error(`Episode download failed: ${episode.title}`, error);
-          updateEpisodeStatus(state.url,episode.url, {
+          await updateEpisodeStatus(state.url, episode.url, {
             status: 'error',
             error: error instanceof Error ? error.message : '不明なエラー'
           });
@@ -365,7 +368,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           isDownloading: false,
           isGenerating: false,
           progress: { current: 0, total: 0 },
-          episodes: {},
           message: '完了しました'
         }
       });
@@ -388,7 +390,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           isDownloading: false,
           isGenerating: false,
           progress: { current: 0, total: 0 },
-          episodes: state.downloadStatus.episodes,
           message: undefined
         }
       });
@@ -418,7 +419,6 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
           isDownloading: false,
           isGenerating: false,
           progress: { current: 0, total: 0 },
-          episodes: {},
           message: 'ダウンロードをキャンセルしました'
         }
       });
