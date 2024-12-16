@@ -10,6 +10,11 @@ import db from '@/lib/database';
 
 const logger = createContextLogger('novel-downloader-hook');
 
+const createPendingStatus = (): EpisodeStatus => ({
+  status: 'pending',
+  error: null
+});
+
 /**
  * 小説ダウンロード機能を提供するカスタムフック
  */
@@ -156,14 +161,14 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
       // データベースからエピソードのステータスを取得
       const dbEpisodes = await db.getEpisodes(state.url);
       const episodeStatusMap = new Map(
-        dbEpisodes.map(ep => [ep.id, ep.status || { status: 'pending', error: null }])
+        dbEpisodes.map(ep => [ep.id, ep.status])
       );
 
       updateState({
         episodes: result.episodes.map(ep => ({
           ...ep,
           selected: false,
-          status: episodeStatusMap.get(ep.id) || { status: 'pending', error: null }
+          status: episodeStatusMap.get(ep.id) || createPendingStatus()
         })),
         metadata: {
           workTitle: result.workTitle,
@@ -266,18 +271,26 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
     const downloadedEpisodes: Array<Episode & { content: string }> = [];
 
     try {
+      // 選択されたエピソードを一括で'downloading'状態に更新
+      await Promise.all(selectedEpisodes.map(async episode => {
+        await updateEpisodeStatus(state.url, episode.id, { status: 'downloading', error: null });
+      }));
+
       // エピソードのダウンロード
-      for (let i = 0; i < selectedEpisodes.length; i++) {
+      for (const episode of selectedEpisodes) {
         if (signal.aborted) {
+          // 中断時は残りのエピソードを'pending'に戻す
+          await Promise.all(
+            selectedEpisodes
+              .filter(ep => ep.status?.status === 'downloading')
+              .map(ep => updateEpisodeStatus(state.url, ep.id, createPendingStatus()))
+          );
           throw new Error('ダウンロードがキャンセルされました');
         }
 
-        updateDownloadProgress(i + 1, selectedEpisodes.length);
-        const episode = selectedEpisodes[i];
+        updateDownloadProgress(downloadedEpisodes.length + 1, selectedEpisodes.length);
 
         try {
-          await updateEpisodeStatus(state.url, episode.url, { status: 'downloading', error: null });
-
           // レート制限の考慮
           const waitTime = getWaitTime(lastRequestTimeRef.current);
           if (waitTime > 0) {
@@ -301,11 +314,11 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
             title: result.title || episode.title
           });
 
-          await updateEpisodeStatus(state.url, episode.url, { status: 'completed', error: null });
+          await updateEpisodeStatus(state.url, episode.id, { status: 'completed', error: null });
 
         } catch (error) {
           logger.error(`Episode download failed: ${episode.title}`, error);
-          await updateEpisodeStatus(state.url, episode.url, {
+          await updateEpisodeStatus(state.url, episode.id, {
             status: 'error',
             error: error instanceof Error ? error.message : '不明なエラー'
           });

@@ -13,7 +13,7 @@ import { type Episode } from '@/types';
 
 // ステータスインジケーターコンポーネント
 const StatusIndicator: React.FC<{ episode: Episode }> = ({ episode }) => {
-  switch (episode.status.status) {
+  switch (episode.status?.status) {
     case 'downloading':
       return <span aria-label="取得中">⏳ 取得中</span>;
     case 'completed':
@@ -67,7 +67,7 @@ export const EpisodeTable: React.FC<EpisodeTableProps> = ({
         <TableColumns />
         <TableBody>
           {episodes.map((episode) => {
-            const isDownloading = episode.status.status === 'downloading';
+            const isDownloading = episode.status?.status === 'downloading';
 
             return (
               <TableRow key={episode.url}>

@@ -405,10 +405,9 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     return {
       id: episodeId,
       title: episodeTitle,
-      groupTitle,
       url: episodeUrl,
       date: datetime,
-      selected: false
+      groupTitle
     };
   }
 

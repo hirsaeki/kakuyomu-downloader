@@ -34,22 +34,19 @@ export interface EpisodeStatus {
 /**
  * Episode Types
  */
-// エピソードの基本情報
+// エピソードの基本情報（パース結果）
 export interface Episode {
-  id: string;           // エピソードの一意識別子
-  title: string;        // エピソードのタイトル
-  groupTitle?: string;  // 所属するグループ名（短編集など）
-  url: string;          // エピソードのURL
-  date: string;         // 公開日
-  selected: boolean;    // UI上での選択状態
-  status: EpisodeStatus; // エピソードの状態（必須）
-  content?: string;     // ダウンロード済みのコンテンツ（オプション）
-  order?: number;       // エピソードの表示順序（オプション）
-}
-
-// ダウンロード済みエピソード
-export interface DownloadedEpisode extends Episode {
-  content: string;  // 必須フィールドとして上書き
+  // 必須フィールド
+  id: string;               // エピソードの一意識別子
+  title: string;            // エピソードのタイトル
+  url: string;              // エピソードのURL
+  date: string;             // 公開日
+  // オプショナルフィールド
+  groupTitle?: string;      // 所属するグループ名（短編集など）
+  order?: number;           // エピソードの表示順序（オプション）
+  content?: string;         // ダウンロード済みのコンテンツ（オプション）
+  selected?: boolean;       // ui上の選択状況
+  status?: EpisodeStatus;
 }
 
 /**
