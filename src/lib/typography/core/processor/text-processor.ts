@@ -107,11 +107,13 @@ export class TextProcessor {
 <head>
   <meta charset="${XML_ENCODING}" />
   <title>${title}</title>
-  <link rel="stylesheet" type="text/css" href="../style.css" />
+  <link rel="stylesheet" type="text/css" href="${EPUB_CONFIG.FILE_STRUCTURE.STYLE}" />
 </head>
 <body>
   <h1>${title}</h1>
-  ${content}
+  <div class="content">
+    ${content}
+  </div>
 </body>
 </html>`;
   }

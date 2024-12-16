@@ -21,9 +21,17 @@ export function generateContentOpf(
     modifiedDate
   } = options;
 
+  // 日付を正しい形式に整形（CCYY-MM-DDThh:mm:ssZ）
+  const formattedDate = new Date(modifiedDate).toISOString();
+
   return `<?xml version="${EPUB_CONFIG.METADATA.XML_VERSION}" encoding="${EPUB_CONFIG.METADATA.XML_ENCODING}"?>
-<package xmlns="${EPUB_CONFIG.METADATA.NAMESPACE.EPUB}" version="${EPUB_CONFIG.METADATA.EPUB_VERSION}" unique-identifier="BookID" xml:lang="${lang}">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+<package xmlns="${EPUB_CONFIG.METADATA.NAMESPACE.OPF}" 
+  xmlns:dc="${EPUB_CONFIG.METADATA.NAMESPACE.DC}"
+  xmlns:opf="${EPUB_CONFIG.METADATA.NAMESPACE.OPF}"
+  version="${EPUB_CONFIG.METADATA.EPUB_VERSION}" 
+  unique-identifier="BookID" 
+  xml:lang="${lang}">
+  <metadata>
     <dc:identifier id="BookID">urn:uuid:${uuid}</dc:identifier>
     <dc:title id="title">${escapeXml(title)}</dc:title>
     <dc:language>${lang}</dc:language>
@@ -40,19 +48,18 @@ export function generateContentOpf(
     <meta property="group-position" refines="#series">${series.position}</meta>
     <meta property="collection-type" refines="#series">series</meta>
     ` : ''}
-    <meta property="dcterms:modified">${modifiedDate}</meta>
+    <meta property="dcterms:modified">${formattedDate}</meta>
     <meta property="dcterms:type">Text</meta>
-    <meta property="rendition:layout">pre-paginated</meta>
+    <meta property="rendition:layout">reflowable</meta>
     <meta property="rendition:orientation">auto</meta>
     <meta property="rendition:spread">none</meta>
-    <meta property="ibooks:specified-fonts">true</meta>
   </metadata>
 
   <manifest>
-    <item id="nav" href="${EPUB_CONFIG.FILE_STRUCTURE.NAV}" media-type="application/xhtml+xml" properties="nav"/>
-    <item id="style" href="${EPUB_CONFIG.FILE_STRUCTURE.STYLE}" media-type="text/css"/>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="style" href="style.css" media-type="text/css"/>
     ${chapters.map((chapter, index) => `
-      <item id="chapter${index + 1}" href="${chapter.filename}" media-type="application/xhtml+xml" ${chapter.landmark ? `properties="${chapter.landmark}"` : ''}/>
+      <item id="chapter${index + 1}" href="${chapter.filename}" media-type="application/xhtml+xml"/>
     `).join('')}
   </manifest>
 
@@ -61,13 +68,5 @@ export function generateContentOpf(
       <itemref idref="chapter${index + 1}" ${chapter.hidden ? 'linear="no"' : ''}/>
     `).join('')}
   </spine>
-
-  <guide>
-    ${chapters
-      .filter(chapter => chapter.landmark)
-      .map(chapter => `
-        <reference type="${chapter.landmark}" title="${escapeXml(chapter.title)}" href="${chapter.filename}"/>
-      `).join('')}
-  </guide>
 </package>`;
 }

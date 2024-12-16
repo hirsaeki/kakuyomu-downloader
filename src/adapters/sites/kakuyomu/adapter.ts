@@ -428,12 +428,19 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
       throw new AppError('本文が見つかりません', 'PARSER_ERROR');
     }
 
+    // 本文要素の各pタグの内容を抽出
+    const paragraphs = Array.from(contentElement.getElementsByTagName('p'));
+    const content = paragraphs
+      .map(p => p.innerHTML.trim())
+      .filter(text => text.length > 0)
+      .join('\n');
+
     const title = titleElement.textContent.trim();
-    const content = contentElement.innerHTML.trim();
 
     adapterLogger.debug('エピソード内容解析完了', {
       title,
-      contentLength: content.length
+      contentLength: content.length,
+      paragraphCount: paragraphs.length
     });
 
     return { title, content };
