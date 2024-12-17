@@ -358,7 +358,7 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
         publisher: 'Kakuyomu Downloader',
         tocTitle: '目次',
         lang: 'ja',
-        modifiedDate: new Date().toISOString(),
+        modifiedDate: new Date().toISOString().replace(/\.\d{3}/, ''),
         content: []
       };
 

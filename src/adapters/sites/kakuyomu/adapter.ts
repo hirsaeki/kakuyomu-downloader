@@ -6,11 +6,25 @@ import { NETWORK_CONFIG } from '@/config/constants';
 import { AppError, ValidationError, NetworkError } from '@/lib/errors';
 import { Episode } from '@/types';
 import { createContextLogger } from '@/lib/logger';
+import DOMPurify from 'dompurify';
 
 const adapterLogger = createContextLogger('kakuyomu-adapter');
 
 // HTML文字列をそのまま受け取る
 type KakuyomuResponse = string;
+
+// 段落解析のための型定義
+interface RawNode {
+  type: 'text' | 'blank';
+  element: Element;
+  blankCount?: number;
+}
+
+interface CleanNode {
+  type: 'text' | 'blank';
+  content: string;
+  blankCount?: number;
+}
 
 export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
   readonly siteName = 'カクヨム';
@@ -411,8 +425,132 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     };
   }
 
+  /**
+ * DOM要素から段落構造を解析
+ */
+  private parseStructure(element: Element): RawNode[] {
+    adapterLogger.debug('段落構造の解析開始');
+    
+    const nodes = Array.from(element.getElementsByTagName('p'))
+      .map(p => {
+        if (p.classList.contains('blank')) {
+          const count = this.countBlankLines(p);
+          adapterLogger.info('空白行を検出', { count });
+          return {
+            type: 'blank' as const,
+            element: p,
+            blankCount: count
+          };
+        }
+        return { 
+          type: 'text' as const,
+          element: p 
+        };
+      });
+
+    adapterLogger.debug('段落構造の解析完了', {
+      totalNodes: nodes.length,
+      blankLines: nodes.filter(n => n.type === 'blank').length
+    });
+
+    return nodes;
+  }
+
+  /**
+   * 空白行のカウント
+   */
+  private countBlankLines(p: Element): number {
+    // brタグの数をカウント
+    const brCount = p.getElementsByTagName('br').length;
+    if (brCount > 0) return brCount;
+
+    // スペースのみの場合は1行
+    return 1;
+  }
+
+  /**
+   * HTMLの安全化と改行の正規化
+   */
+  private sanitizeNodes(nodes: RawNode[]): CleanNode[] {
+    adapterLogger.debug('コンテンツのサニタイズ開始');
+
+    const config = {
+      ALLOWED_TAGS: ['ruby', 'rt', 'rp'],
+      ALLOWED_ATTR: [],
+      KEEP_CONTENT: true
+    };
+
+    const cleanNodes = nodes.map(node => {
+      if (node.type === 'blank') {
+        return {
+          type: 'blank' as const,
+          content: '',
+          blankCount: node.blankCount
+        };
+      }
+
+      const html = node.element.innerHTML;
+      const clean = DOMPurify.sanitize(html, config);
+      const withBreaks = clean.replace(/\n/g, '<br />');
+
+      return {
+        type: 'text' as const,
+        content: withBreaks
+      };
+    });
+
+    adapterLogger.debug('コンテンツのサニタイズ完了', {
+      inputNodes: nodes.length,
+      outputNodes: cleanNodes.length
+    });
+
+    return cleanNodes;
+  }
+
+  /**
+   * 最終的なEPUB用コンテンツの生成
+   */
+  private processContent(nodes: CleanNode[]): string {
+    adapterLogger.debug('EPUB用コンテンツの生成開始');
+
+    let currentParagraph: string[] = [];
+    const paragraphs: string[] = [];
+    let consecutiveBlankCount = 0;
+
+    nodes.forEach((node) => {
+      if (node.type === 'blank') {
+        // 空白行は蓄積
+        consecutiveBlankCount += node.blankCount ?? 1;
+      } else {
+        // 2行以上の空白で段落区切り
+        if (consecutiveBlankCount >= 2) {
+          if (currentParagraph.length > 0) {
+            paragraphs.push(`<p>${currentParagraph.join('')}</p>`);
+            currentParagraph = [];
+          }
+        } else if (consecutiveBlankCount === 1) {
+        // 1行分の空白は段落内2連続改行
+            currentParagraph.push('<br /><br />');
+        }
+        currentParagraph.push(node.content);
+        consecutiveBlankCount = 0;
+      }
+    });
+
+    // 最後の段落
+    if (currentParagraph.length > 0) {
+      paragraphs.push(`<p>${currentParagraph.join('')}</p>`);
+    }
+
+    adapterLogger.debug('EPUB用コンテンツの生成完了', {
+      paragraphCount: paragraphs.length
+    });
+
+    return paragraphs.join('\n');
+  }
+
   private parseEpisodeContent(doc: Document): { title: string; content: string } {
-    // タイトル要素のチェック
+  // タイトル要素のチェック
     const titleElement = doc.querySelector(KakuyomuAdapter.SELECTORS.CONTENT_TITLE);
     if (!titleElement?.textContent?.trim()) {
       adapterLogger.error('エピソードタイトルが不在または空');
@@ -421,28 +559,40 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
 
     // 本文要素のチェック
     const contentElement = doc.querySelector(KakuyomuAdapter.SELECTORS.EPISODE_CONTENT);
-    if (!contentElement?.innerHTML?.trim()) {
+    if (!contentElement) {
       adapterLogger.error('エピソード本文が不在または空', {
         title: titleElement.textContent.trim()
       });
       throw new AppError('本文が見つかりません', 'PARSER_ERROR');
     }
 
-    // 本文要素の各pタグの内容を抽出
-    const paragraphs = Array.from(contentElement.getElementsByTagName('p'));
-    const content = paragraphs
-      .map(p => p.innerHTML.trim())
-      .filter(text => text.length > 0)
-      .join('\n');
+    try {
+      // 段落構造の解析
+      const rawNodes = this.parseStructure(contentElement);
+      // HTMLの安全化
+      const cleanNodes = this.sanitizeNodes(rawNodes);
+      // EPUBコンテンツの生成
+      const content = this.processContent(cleanNodes);
 
-    const title = titleElement.textContent.trim();
+      adapterLogger.info('エピソード内容解析完了', {
+        title: titleElement.textContent.trim(),
+        contentLength: content.length
+      });
 
-    adapterLogger.debug('エピソード内容解析完了', {
-      title,
-      contentLength: content.length,
-      paragraphCount: paragraphs.length
-    });
-
-    return { title, content };
+      return {
+        title: titleElement.textContent.trim(),
+        content
+      };
+    } catch (error) {
+      adapterLogger.error('エピソード解析エラー', {
+        title: titleElement.textContent.trim(),
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : 'Unknown error'
+      });
+      throw error;
+    }
   }
 }

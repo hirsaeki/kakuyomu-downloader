@@ -121,8 +121,19 @@ export class StructureGenerator {
    * @param chapters 生成済みのチャプター情報
    * @param uuid 一意識別子
    */
-  private async createOEBPS(zip: JSZip, metadata: EPUBMetadata, chapters: GeneratedChapter[], uuid: string): Promise<void> {
+  private async createOEBPS(
+    zip: JSZip,
+    metadata: EPUBMetadata,
+    chapters: GeneratedChapter[],
+    uuid: string
+  ): Promise<void> {
     try {
+      // OEBPSフォルダの作成
+      const oebps = zip.folder('OEBPS');
+      if (!oebps) {
+        throw new GenerationError('OEBPSフォルダの作成に失敗');
+      }
+
       // テンプレート生成
       const { navXhtml, contentOpf } = generateXmlTemplates(
         metadata.lang,
@@ -130,25 +141,19 @@ export class StructureGenerator {
         chapters.map((chapter, index) => this.convertToOutputChapter(chapter, index)),
         uuid
       );
-  
+
       // Navigation Document (nav.xhtml)
       try {
-        const navPath = EPUB_CONFIG.FILE_STRUCTURE.NAV;
-        structureLogger.debug(`Navigation Documentを生成: ${navPath}`);
+        structureLogger.debug(`Navigation Documentを生成: ${EPUB_CONFIG.FILE_STRUCTURE.NAV}`);
         
         if (!navXhtml) {
           throw new GenerationError('Navigation Documentのテンプレート生成に失敗');
         }
   
-        zip.file(navPath, navXhtml, {
+        oebps.file(EPUB_CONFIG.FILE_STRUCTURE.NAV, navXhtml, {
           compression: EPUB_CONFIG.COMPRESSION.TYPE,
           compressionOptions: { level: EPUB_CONFIG.COMPRESSION.LEVEL }
         });
-  
-        // 生成確認
-        if (!zip.file(navPath)) {
-          throw new GenerationError('Navigation Documentのファイル生成に失敗');
-        }
       } catch (error) {
         structureLogger.error('Navigation Document生成エラー', { error });
         throw new GenerationError(`Navigation Document生成に失敗: ${error instanceof Error ? error.message : '不明なエラー'}`);
@@ -156,18 +161,13 @@ export class StructureGenerator {
   
       // スタイルシート (style.css)
       try {
-        const stylePath = EPUB_CONFIG.FILE_STRUCTURE.STYLE;
         const styles = generateDefaultStyles();
-        structureLogger.debug(`スタイルシートを生成: ${stylePath}`);
+        structureLogger.debug(`スタイルシートを生成: ${EPUB_CONFIG.FILE_STRUCTURE.STYLE}`);
         
-        zip.file(stylePath, styles, {
+        oebps.file(EPUB_CONFIG.FILE_STRUCTURE.STYLE, styles, {
           compression: EPUB_CONFIG.COMPRESSION.TYPE,
           compressionOptions: { level: EPUB_CONFIG.COMPRESSION.LEVEL }
         });
-  
-        if (!zip.file(stylePath)) {
-          throw new GenerationError('スタイルシートのファイル生成に失敗');
-        }
       } catch (error) {
         structureLogger.error('スタイルシート生成エラー', { error });
         throw new GenerationError(`スタイルシート生成に失敗: ${error instanceof Error ? error.message : '不明なエラー'}`);
@@ -175,21 +175,16 @@ export class StructureGenerator {
   
       // Package Document (content.opf)
       try {
-        const contentPath = EPUB_CONFIG.FILE_STRUCTURE.CONTENT;
-        structureLogger.debug(`OPFファイルを生成: ${contentPath}`);
+        structureLogger.debug(`OPFファイルを生成: ${EPUB_CONFIG.FILE_STRUCTURE.CONTENT}`);
         
         if (!contentOpf) {
           throw new GenerationError('Package Documentのテンプレート生成に失敗');
         }
   
-        zip.file(contentPath, contentOpf, {
+        oebps.file(EPUB_CONFIG.FILE_STRUCTURE.CONTENT, contentOpf, {
           compression: EPUB_CONFIG.COMPRESSION.TYPE,
           compressionOptions: { level: EPUB_CONFIG.COMPRESSION.LEVEL }
         });
-  
-        if (!zip.file(contentPath)) {
-          throw new GenerationError('Package Documentのファイル生成に失敗');
-        }
       } catch (error) {
         structureLogger.error('Package Document生成エラー', { error });
         throw new GenerationError(`Package Document生成に失敗: ${error instanceof Error ? error.message : '不明なエラー'}`);
@@ -225,9 +220,9 @@ export class StructureGenerator {
   private async validateStructure(zip: JSZip): Promise<void> {
     const requiredFiles = [
       EPUB_CONFIG.FILE_STRUCTURE.CONTAINER,
-      EPUB_CONFIG.FILE_STRUCTURE.CONTENT,
-      EPUB_CONFIG.FILE_STRUCTURE.NAV,
-      EPUB_CONFIG.FILE_STRUCTURE.STYLE
+      `OEBPS/${EPUB_CONFIG.FILE_STRUCTURE.CONTENT}`,
+      `OEBPS/${EPUB_CONFIG.FILE_STRUCTURE.NAV}`,
+      `OEBPS/${EPUB_CONFIG.FILE_STRUCTURE.STYLE}`
     ];
 
     for (const file of requiredFiles) {
@@ -261,6 +256,9 @@ export class StructureGenerator {
     return { total, byFile: sizes };
   }
 
+  /**
+   * チャプター情報を出力用の形式に変換
+   */
   private convertToOutputChapter(chapter: GeneratedChapter, index: number): OutputChapter {
     return {
       title: chapter.title,

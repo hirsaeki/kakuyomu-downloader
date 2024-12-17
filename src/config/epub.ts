@@ -33,9 +33,9 @@ export const EPUB_CONFIG = {
   FILE_STRUCTURE: {
     MIMETYPE: 'mimetype',
     CONTAINER: 'META-INF/container.xml',
-    CONTENT: 'OEBPS/content.opf',
-    NAV: 'OEBPS/nav.xhtml',
-    STYLE: 'OEBPS/style.css',
+    CONTENT: 'content.opf',      // OEBPSプレフィックスを除去
+    NAV: 'nav.xhtml',           // OEBPSプレフィックスを除去
+    STYLE: 'style.css',         // OEBPSプレフィックスを除去
     CHAPTER_PREFIX: 'chapter_'
   },
 
