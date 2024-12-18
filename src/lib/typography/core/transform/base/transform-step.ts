@@ -1,22 +1,10 @@
-import type { TransformContext, TransformResult } from './types';
+import type { ITransformStep, TransformContext, TransformResult } from '../types';
 import { TransformError } from '@/lib/errors';
 import { createContextLogger } from '@/lib/logger';
 
 const stepLogger = createContextLogger('typography-step');
 
-export interface TransformStep {
-  /**
-   * 変換ステップが適用可能かどうかを判定
-   */
-  isApplicable(context: TransformContext): boolean;
-
-  /**
-   * 実際の変換処理を実行
-   */
-  execute(context: TransformContext): Promise<TransformResult>;
-}
-
-export abstract class BaseTransformStep implements TransformStep {
+export abstract class BaseTransformStep implements ITransformStep {
   private readonly name: string;
 
   constructor() {
@@ -25,18 +13,27 @@ export abstract class BaseTransformStep implements TransformStep {
 
   isApplicable(context: TransformContext): boolean {
     if (!context) {
-      stepLogger.error(`${this.name}: Invalid context provided`);
-      throw new TransformError('変換コンテキストが指定されていません');
+        stepLogger.error(`${this.name}: Invalid context provided`);
+        throw new TransformError('変換コンテキストが指定されていません');
     }
 
-    const applicable = context.text !== null && context.text !== undefined;
+    // textプロパティの存在と型のチェック
+    if (typeof context.text !== 'string') {
+        stepLogger.debug(`${this.name}: Invalid text property type`);
+        return false;
+    }
+
+    // 変換可能性の判定（空文字列は変換可能とする）
+    const applicable = true;
+    
     stepLogger.debug(`${this.name}: Checking applicability`, {
-      applicable,
-      textLength: context.text?.length ?? 0
+        applicable,
+        textLength: context.text.length
     });
 
     return applicable;
   }
+  //old
 
   async execute(context: TransformContext): Promise<TransformResult> {
     stepLogger.debug(`${this.name}: Starting execution`, {

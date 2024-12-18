@@ -12,8 +12,4 @@ export class TypographyDOMOperator extends BaseDOMOperator implements Typography
     span.textContent = text;
     return span;
   }
-
-  // 既存機能はこれだけなんだけど...
-  // でも、インターフェースと継承関係はちゃんと整理しておいたわよ！
-  // （将来の拡張に備えて...って、べつにあなたのためじゃないんだからね！）
 }

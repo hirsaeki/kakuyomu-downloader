@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../base/types';
+import type { TransformContext, TransformResult } from '../types';
 import { TransformError } from '@/lib/errors';
 
 interface ProcessGroupContext extends TransformContext {
@@ -16,12 +16,16 @@ export class ProcessGroupStep extends BaseTransformStep {
   }
 
   override isApplicable(context: TransformContext): context is ProcessGroupContext {
-    if (!super.isApplicable({ text: context.match?.[this.group] ?? '' })) return false;
-    // マッチ情報とグループ内容、再処理関数の存在を確認
-    return context.match !== undefined && 
-           this.group < context.match.length && 
-           context.match[this.group] !== undefined &&
-           context.reprocess !== undefined;
+    // まず必要な要素の存在確認
+    if (context.match === undefined || 
+        this.group >= context.match.length || 
+        context.match[this.group] === undefined || 
+        context.reprocess === undefined) {
+        return false;
+    }
+    
+    // 親クラスのチェックは有効なグループ内容に対して行う
+    return super.isApplicable({ text: context.match[this.group] });
   }
 
   protected async processTransform(context: TransformContext): Promise<TransformResult> {

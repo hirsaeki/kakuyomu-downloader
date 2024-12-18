@@ -1,1 +1,1 @@
-export * from './text-processor';
+export * from './typography-processor';

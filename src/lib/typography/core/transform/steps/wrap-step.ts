@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../base/types';
+import type { TransformContext, TransformResult } from '../types';
 
 export class WrapStep extends BaseTransformStep {
   constructor(

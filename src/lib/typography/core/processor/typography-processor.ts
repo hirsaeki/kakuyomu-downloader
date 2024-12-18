@@ -1,303 +1,361 @@
 import { TypographyDOMOperator } from '../dom';
 import { TransformExecutor } from '../transform/transform-executor';
-// @ts-expect-error Viteプラグインで作成されるtsファイル
-import type { GeneratedPattern } from '../config/generated/patterns';
-import type { ProcessedRange } from '../transform/base/types';
+import type { GeneratedPattern } from 'virtual:pattern-config';
+import type { ProcessedRange } from '../transform/types';
 import { ProcessorError, ValidationError } from '@/lib/errors';
-import { TEXT_PROCESSING_CONFIG } from '@/config/constants';
-import DOMPurify from 'dompurify';
 import { createContextLogger } from '@/lib/logger';
+import DOMPurify from 'dompurify';
 
-const typographyLogger = createContextLogger('TypographyProcessor');
+const typographyLogger = createContextLogger('typography-processor');
 
-/**
- * 組版処理の中核を担うプロセッサー
- * テキストの変換とDOM操作を統合的に管理
- */
+interface ProcessingQueue {
+  node: Node;
+  parent: Node;
+  patterns: GeneratedPattern[];
+}
+
 export class TypographyProcessor {
   private static instance: TypographyProcessor | null = null;
-  private transformExecutors: Map<string, TransformExecutor> = new Map();
+  private readonly patterns: GeneratedPattern[];
+  private readonly executors: Map<string, TransformExecutor>;
 
   private constructor(
-    private patterns: GeneratedPattern[],
-    private domOperator: TypographyDOMOperator
+    patterns: GeneratedPattern[],
+    private readonly domOperator: TypographyDOMOperator
   ) {
-    if (!patterns || !domOperator) {
-      throw new ProcessorError('Patterns and DOMOperator are required');
+    this.patterns = this.sortPatterns(patterns);
+    this.executors = new Map(
+      this.patterns.map(pattern => [
+        pattern.name,
+        TransformExecutor.fromPattern(pattern)
+      ])
+    );
+    typographyLogger.info('TypographyProcessor initialized', {
+      patternCount: patterns.length
+    });
+  }
+
+  static getInstance(
+    patterns?: GeneratedPattern[],
+    domOperator?: TypographyDOMOperator
+  ): TypographyProcessor {
+    typographyLogger.debug('getInstance called', {
+      hasPatterns: !!patterns,
+      patternsLength: patterns?.length ?? 0,
+      hasDomOperator: !!domOperator
+    });
+
+    if (!this.instance) {
+      if (!patterns) {
+        typographyLogger.error('初期化エラー: パターンが未定義');
+        throw new ProcessorError(
+          'TypographyProcessor initialization failed: Patterns are required'
+        );
+      }
+      if (!domOperator) {
+        typographyLogger.error('初期化エラー: DOMOperatorが未定義');
+        throw new ProcessorError(
+          'TypographyProcessor initialization failed: DOMOperator is required'
+        );
+      }
+      
+      try {
+        this.instance = new TypographyProcessor(patterns, domOperator);
+        typographyLogger.info('TypographyProcessor 初期化成功', {
+          patternsCount: patterns.length
+        });
+      } catch (error) {
+        typographyLogger.error('初期化エラー: インスタンス生成失敗', {
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          } : 'Unknown error'
+        });
+        throw new ProcessorError(
+          `TypographyProcessor initialization failed: ${
+            error instanceof Error ? error.message : '不明なエラー'
+          }`
+        );
+      }
     }
-    this.initializeExecutors();
+
+    return this.instance;
   }
 
   /**
-   * シングルトンインスタンスの取得
+   * HTMLコンテンツの処理
    */
-  static getInstance(patterns?: GeneratedPattern[], domOperator?: TypographyDOMOperator): TypographyProcessor {
-    if (!TypographyProcessor.instance && patterns && domOperator) {
-      TypographyProcessor.instance = new TypographyProcessor(patterns, domOperator);
-    }
-    if (!TypographyProcessor.instance) {
-      throw new ProcessorError('TypographyProcessor is not initialized');
-    }
-    return TypographyProcessor.instance;
-  }
-
-  /**
-   * HTMLをXHTML形式に変換
-   */
-  public async convertToXhtml(html: string, title: string = 'Chapter'): Promise<string> {
+  public async process(html: string): Promise<DocumentFragment> {
     if (!html) {
       throw new ValidationError('HTML content is empty');
     }
 
+    typographyLogger.info('Starting content processing', {
+      contentLength: html.length
+    });
+
     try {
-      // HTML sanitization
-      const cleanHtml = DOMPurify.sanitize(html, TEXT_PROCESSING_CONFIG.SANITIZER_CONFIG);
-      const doc = this.createDocument(title);
-      const contentDoc = new DOMParser().parseFromString(cleanHtml, 'text/html');
+      // サニタイズ処理
+      const cleanHtml = this.sanitizeContent(html);
+      
+      // DOM構築
+      const doc = new DOMParser().parseFromString(cleanHtml, 'text/html');
+      const fragment = document.createDocumentFragment();
 
-      // Process content
-      await this.processNode(contentDoc.body);
+      // 処理キューの初期化
+      const queue: ProcessingQueue[] = Array.from(doc.body.childNodes).map(node => ({
+        node,
+        parent: fragment,
+        patterns: this.patterns
+      }));
 
-      // Move processed content
-      this.moveContent(contentDoc.body, doc.body);
+      // コンテンツの処理
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (!current) break;
 
-      // Serialize to XHTML
-      const serialized = new XMLSerializer().serializeToString(doc);
-      const result = this.formatXhtml(serialized);
-
-      if (doc.getElementsByTagName('parsererror').length > 0) {
-        throw new ProcessorError('Invalid XHTML generated');
+        await this.processQueueItem(current, queue);
       }
 
-      return result;
+      typographyLogger.info('Content processing completed', {
+        fragmentChildCount: fragment.childNodes.length
+      });
+
+      return fragment;
 
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof ProcessorError) {
-        throw error;
-      }
+      typographyLogger.error('Content processing failed', error);
       throw new ProcessorError(
-        `XHTML conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `処理に失敗: ${error instanceof Error ? error.message : '不明なエラー'}`
       );
     }
   }
 
   /**
-   * 各パターンに対応するExecutorを初期化
+   * キューアイテムの処理
    */
-  private initializeExecutors(): void {
-    this.patterns.forEach(pattern => {
-      try {
-        const executor = TransformExecutor.fromPattern(pattern);
-        this.transformExecutors.set(pattern.name, executor);
-      } catch (error) {
-        typographyLogger.error(`Failed to initialize executor for pattern ${pattern.name}:`, error);
-      }
-    });
+  private async processQueueItem(
+    item: ProcessingQueue,
+    queue: ProcessingQueue[]
+  ): Promise<void> {
+    const { node, parent, patterns } = item;
 
-    if (this.transformExecutors.size === 0) {
-      typographyLogger.warn('No transform executors initialized');
+    try {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+        // テキストノードの処理
+        const processed = await this.processTextContent(
+          node.textContent,
+          patterns
+        );
+        processed.forEach(n => parent.appendChild(n));
+
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // 要素ノードの処理
+        const element = node.cloneNode(false) as Element;
+        parent.appendChild(element);
+
+        // 子ノードをキューに追加
+        Array.from(node.childNodes).forEach(child => {
+          queue.push({
+            node: child,
+            parent: element,
+            patterns
+          });
+        });
+      }
+    } catch (error) {
+      typographyLogger.error('Queue item processing failed', {
+        nodeType: node.nodeType,
+        error
+      });
+      throw error;
     }
   }
 
   /**
-   * DOMノードを処理
+   * テキストコンテンツの処理
    */
-  private async processNode(node: Node): Promise<void> {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-      await this.processTextContent(node);
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as Element;
-      if (element.tagName.toLowerCase() === 'p') {
-        this.ensureLeadingSpace(element);
-      }
-      for (const child of Array.from(element.childNodes)) {
-        await this.processNode(child);
-      }
-    }
-  }
-
-  /**
-   * テキストコンテンツを処理
-   */
-  private async processTextContent(node: Node): Promise<void> {
-    if (!node.textContent) return;
-      const parentNode = node.parentNode;
-    if (!parentNode) return;
-
-    const text = node.textContent;
+  private async processTextContent(
+    text: string,
+    patterns: GeneratedPattern[]
+  ): Promise<Node[]> {
+    const nodes: Node[] = [];
+    const ranges = new Set<ProcessedRange>();
     let currentPosition = 0;
-    const processedRanges: ProcessedRange[] = [];
-    const fragments: Node[] = [];
-    let lastProcessedPosition = 0;
 
     while (currentPosition < text.length) {
-      // 重複範囲のチェック
-      const overlappingRange = this.findOverlappingRange(currentPosition, processedRanges);
-      if (overlappingRange) {
-        // 未処理部分があれば通常のテキストとして追加
-        if (lastProcessedPosition < overlappingRange.start) {
-          fragments.push(
-            this.domOperator.createTextNode(
-              text.substring(lastProcessedPosition, overlappingRange.start)
-            )
-          );
-        }
-        currentPosition = overlappingRange.end;
-        lastProcessedPosition = currentPosition;
+      // 処理済み範囲のスキップ
+      const skipTo = this.findNextUnprocessedPosition(currentPosition, ranges);
+      if (skipTo > currentPosition) {
+        // スキップした範囲のテキストをそのまま追加
+        const skipped = text.substring(currentPosition, skipTo);
+        nodes.push(this.domOperator.createTextNode(skipped));
+        currentPosition = skipTo;
         continue;
       }
 
-      // パターンマッチングと変換処理
-      let processed = false;
-      for (const [patternName, executor] of this.transformExecutors.entries()) {
-        try {
-          const result = await executor.execute({
-            text: text.slice(currentPosition),
-            processedRanges
+      // パターンマッチングと処理
+      let matched = false;
+      for (const pattern of patterns) {
+        if (this.shouldSkipPattern(pattern, currentPosition, text, ranges)) {
+          continue;
+        }
+
+        const executor = this.executors.get(pattern.name);
+        if (!executor) continue;
+
+        const result = await this.tryProcessPattern(
+          pattern,
+          executor,
+          text,
+          currentPosition
+        );
+
+        if (result) {
+          const { node, length } = result;
+          nodes.push(node);
+          ranges.add({
+            start: currentPosition,
+            end: currentPosition + length,
+            pattern: pattern.name
           });
-
-          if (result) {
-            // 未処理部分があれば通常のテキストとして追加
-            if (currentPosition > lastProcessedPosition) {
-              fragments.push(
-                this.domOperator.createTextNode(
-                  text.substring(lastProcessedPosition, currentPosition)
-                )
-              );
-            }
-
-            // 変換結果を追加
-            if (result.type === 'text') {
-              fragments.push(this.domOperator.createTextNode(result.content));
-            } else {
-              fragments.push(this.domOperator.createTcyElement(result.content));
-            }
-
-            // 処理範囲を記録
-            const matchLength = result.content.length;
-            processedRanges.push({
-              start: currentPosition,
-              end: currentPosition + matchLength,
-              pattern: patternName
-            });
-
-            currentPosition += matchLength;
-            lastProcessedPosition = currentPosition;
-            processed = true;
-            break;
-          }
-        } catch (error) {
-          typographyLogger.error(`Pattern ${patternName} processing failed:`, error);
+          currentPosition += length;
+          matched = true;
+          break;
         }
       }
 
-      if (!processed) {
+      // マッチしなかった場合は1文字進める
+      if (!matched) {
+        const char = text.charAt(currentPosition);
+        nodes.push(this.domOperator.createTextNode(char));
         currentPosition++;
       }
     }
 
-    // 残りの未処理部分を追加
-    if (lastProcessedPosition < text.length) {
-      fragments.push(
-        this.domOperator.createTextNode(
-          text.substring(lastProcessedPosition)
-        )
-      );
-    }
+    return nodes;
+  }
 
-    // 結果をDOMに反映
-    if (fragments.length > 0) {
-      fragments.forEach(fragment => {
-        parentNode.insertBefore(fragment, node);
+  /**
+   * パターン処理の試行
+   */
+  private async tryProcessPattern(
+    pattern: GeneratedPattern,
+    executor: TransformExecutor,
+    text: string,
+    position: number
+  ): Promise<{ node: Node; length: number } | null> {
+    try {
+      // パターンのコンパイルと実行
+      const regexp = new RegExp(pattern.pattern.source, pattern.pattern.flags);
+      regexp.lastIndex = position;
+      
+      const match = regexp.exec(text);
+      if (!match || match.index !== position) return null;
+
+      // 先読み・後読みの確認
+      if (pattern.pattern.lookbehind || pattern.pattern.lookahead) {
+        const fullPattern = this.buildFullPattern(pattern);
+        const fullRegexp = new RegExp(fullPattern, pattern.pattern.flags);
+        fullRegexp.lastIndex = position;
+        
+        const fullMatch = fullRegexp.exec(text);
+        if (!fullMatch || fullMatch.index !== position) return null;
+      }
+
+      // 変換の実行
+      const result = await executor.execute({
+        text: match[0],
+        match,
+        processedRanges: []
       });
-      node.parentNode.removeChild(node);
+
+      // 変換結果からノードを生成
+      const node = result.type === 'tcy'
+        ? this.domOperator.createTcyElement(result.content)
+        : this.domOperator.createTextNode(result.content);
+
+      return {
+        node,
+        length: match[0].length
+      };
+
+    } catch (error) {
+      typographyLogger.warn('Pattern processing failed', {
+        pattern: pattern.name,
+        error
+      });
+      return null;
     }
   }
 
   /**
-   * 段落の先頭スペースを確保
+   * サニタイズ処理
    */
-  private ensureLeadingSpace(element: Element): void {
-    const firstChild = element.firstChild;
-    
-    if (!firstChild) {
-      element.textContent = '\u3000';
-      return;
-    }
-
-    if (firstChild.nodeType === Node.TEXT_NODE && firstChild.textContent) {
-      const text = firstChild.textContent;
-      if (!/^[\s\u3000]/.test(text)) {
-        firstChild.textContent = '\u3000' + text;
-      }
-    } else if (element.childNodes.length > 0) {
-      const spaceNode = element.ownerDocument?.createTextNode('\u3000');
-      if (spaceNode) {
-        element.insertBefore(spaceNode, element.firstChild);
-      }
-    }
-  }
-
-  /**
-   * 指定位置が処理済み範囲と重複しているかチェック
-   */
-  private findOverlappingRange(position: number, ranges: ProcessedRange[]): ProcessedRange | null {
-    return ranges.find(range =>
-      position >= range.start && position < range.end
-    ) || null;
-  }
-
-  /**
-   * XHTML文書を作成
-   */
-  private createDocument(title: string): Document {
-    const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
-  <head>
-    <title>${this.escapeXml(title)}</title>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" type="text/css" href="style.css" />
-  </head>
-  <body></body>
-</html>`;
-
-    return new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');
-  }
-
-  /**
-   * DOMコンテンツを移動
-   */
-  private moveContent(source: Node, target: Node): void {
-    const ownerDocument = target.ownerDocument;
-    if (!ownerDocument) {
-      throw new ProcessorError('Target node has no ownerDocument');
-    }
-
-    Array.from(source.childNodes).forEach(node => {
-      const importedNode = ownerDocument.importNode(node, true);
-      target.appendChild(importedNode);
+  private sanitizeContent(html: string): string {
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'ruby', 'rt', 'rp'],
+      ALLOWED_ATTR: [],
+      KEEP_CONTENT: true
     });
   }
 
   /**
-   * XML特殊文字をエスケープ
+   * パターンの優先順位によるソート
    */
-  private escapeXml(unsafe: string): string {
-    return unsafe.replace(/[<>&'"]/g, char => ({
-      '<': '&lt;',
-      '>': '&gt;',
-      '&': '&amp;',
-      '\'': '&apos;',
-      '"': '&quot;'
-    }[char] || char));
+  private sortPatterns(patterns: GeneratedPattern[]): GeneratedPattern[] {
+    return [...patterns].sort((a, b) => {
+      const priorityA = a.priority ?? 0;
+      const priorityB = b.priority ?? 0;
+      return priorityB - priorityA;  // 降順
+    });
   }
 
   /**
-   * XHTML形式に整形
+   * 次の未処理位置の検索
    */
-  private formatXhtml(serialized: string): string {
-    const withoutXmlDecl = serialized.replace(/<\?xml[^>]*\?>/, '');
-    return `<?xml version="1.0" encoding="UTF-8"?>${withoutXmlDecl}`;
+  private findNextUnprocessedPosition(
+    position: number,
+    ranges: Set<ProcessedRange>
+  ): number {
+    let nextPosition = position;
+    for (const range of ranges) {
+      if (position >= range.start && position < range.end) {
+        nextPosition = Math.max(nextPosition, range.end);
+      }
+    }
+    return nextPosition;
+  }
+
+  /**
+   * パターンのスキップ判定
+   */
+  private shouldSkipPattern(
+    pattern: GeneratedPattern,
+    position: number,
+    text: string,
+    ranges: Set<ProcessedRange>
+  ): boolean {
+    // 処理済み範囲との重複チェック
+    for (const range of ranges) {
+      if (position >= range.start && position < range.end) {
+        return true;
+      }
+    }
+
+    // 先読み・後読みパターンの場合の位置チェック
+    if (pattern.pattern.lookbehind && position === 0) return true;
+    if (pattern.pattern.lookahead && position === text.length - 1) return true;
+
+    return false;
+  }
+
+  /**
+   * 完全なパターンの構築（先読み・後読みを含む）
+   */
+  private buildFullPattern(pattern: GeneratedPattern): string {
+    const { source, lookbehind, lookahead } = pattern.pattern;
+    return `${lookbehind || ''}${source}${lookahead || ''}`;
   }
 }

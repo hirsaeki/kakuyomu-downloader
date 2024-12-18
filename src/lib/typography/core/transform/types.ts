@@ -37,18 +37,42 @@ export interface ConversionRule {
 /**
  * 変換ステップの設定
  */
-export interface TransformStep {
+export interface ITransformStep {
+  // 変換ステップが適用可能かどうかを判定
+  isApplicable(context: TransformContext): boolean;
+  // 実際の変換処理を実行
+  execute(context: TransformContext): Promise<TransformResult>;
+}
+
+export interface TransformStepDefinition {
   action: TransformAction;
   // 各アクション用の設定
+  // wrap用設定
   prefix?: string;
   suffix?: string;
-  target?: WidthTarget;
-  direction?: WidthDirection;
+
+  // convertWidth用設定
+  target?: 'numbers' | 'alphabet' | 'symbols';
+  direction?: 'fullwidth' | 'halfwidth';
+
+  // replace用設定
   from?: string;
   to?: string;
+
+  // processGroup用設定
   group?: number;
-  rules?: ConversionRule[];
+
+  // splitBy用設定
   separator?: string | string[];
+
+  // convertEach, convertGroups用設定
+  rules?: Array<{
+    group?: number;
+    type: 'toKanji' | 'toFullwidth';
+    params?: Record<string, unknown>;
+  }>;
+
+  // join用設定
   with?: string;
   template?: string;
 }
@@ -58,7 +82,7 @@ export interface TransformStep {
  */
 export interface PatternConfig {
   pattern: string;  // 正規表現パターン
-  transform: TransformStep[];  // 変換ステップの配列
+  transform: TransformStepDefinition[];  // 変換ステップの配列
   priority?: number;  // 優先度（オプション）
   description?: string;  // パターンの説明（オプション）
 }
@@ -88,4 +112,21 @@ export interface TransformContext {
 export interface TransformResult {
   type: 'text' | 'tcy';
   content: string;
+}
+
+/**
+ * パターン変換の設定
+ */
+export interface TransformConfig {
+  // 変換タイプ
+  type: 'text' | 'tcy';
+
+  // 変換ステップの配列
+  steps: TransformStepDefinition[];
+
+  // スペース制御
+  ensureSpace?: {
+    before?: boolean;
+    after?: boolean;
+  };
 }

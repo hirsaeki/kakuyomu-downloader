@@ -1,7 +1,6 @@
-import type { TransformStep } from './base/transform-step';
-import type { TransformContext, TransformResult } from './base/types';
-// @ts-expect-error Viteプラグインで作成されるtsファイル
-import type { GeneratedPattern } from '../config/generated/patterns';
+import type { ITransformStep } from '../transform/types';
+import type { TransformContext, TransformResult } from './types';
+import type { GeneratedPattern } from 'virtual:pattern-config';
 import { TransformError } from '@/lib/errors';
 import { StepFactory } from './factory/step-factory';
 import { createContextLogger } from '@/lib/logger';
@@ -12,7 +11,7 @@ const transformLogger = createContextLogger('typography-transform');
  * 変換処理の実行を管理するExecutor
  */
 export class TransformExecutor {
-  private steps: TransformStep[] = [];
+  private steps: ITransformStep[] = [];
 
   /**
    * パターンからExecutorを生成するファクトリメソッド
@@ -23,7 +22,7 @@ export class TransformExecutor {
     const steps = StepFactory.createFromPattern(pattern);
     transformLogger.debug('Steps created from pattern', { 
       stepCount: steps.length,
-      patternType: pattern.type 
+      patternType: pattern.transform.type  // pattern.typeをpattern.transform.typeに修正
     });
     steps.forEach(step => executor.addStep(step));
     return executor;
@@ -32,7 +31,7 @@ export class TransformExecutor {
   /**
    * 変換ステップを追加（テスト用に残しておく）
    */
-  private addStep(step: TransformStep): this {
+  private addStep(step: ITransformStep): this {
     transformLogger.debug('Adding transform step', { 
       stepType: step.constructor.name 
     });
@@ -45,55 +44,92 @@ export class TransformExecutor {
    */
   async execute(context: TransformContext): Promise<TransformResult> {
     transformLogger.info('Starting transform execution', {
-      initialTextLength: context.text?.length ?? 0,
-      stepsCount: this.steps.length
+        initialTextLength: context.text?.length ?? 0,
+        stepsCount: this.steps.length
     });
 
     if (!context.text) {
-      transformLogger.error('Transform execution failed: No text provided');
-      throw new TransformError('No text provided for transformation');
+        transformLogger.error('Transform execution failed: No text provided');
+        throw new TransformError('No text provided for transformation');
     }
 
     if (this.steps.length === 0) {
-      transformLogger.warn('No transform steps registered');
-      return { type: 'text', content: context.text };
+        transformLogger.warn('No transform steps registered');
+        return { type: 'text', content: context.text };
     }
 
-    let result = context.text;
+    let currentResult: TransformResult = { 
+        type: 'text', 
+        content: context.text 
+    };
     
     for (const step of this.steps) {
-      try {
-        transformLogger.debug(`Executing step: ${step.constructor.name}`, {
-          currentTextLength: result.length
-        });
+        try {
+            const stepContext = {
+                ...context,
+                text: currentResult.content,
+                previousType: currentResult.type
+            };
 
-        if (step.isApplicable({ ...context, text: result })) {
-          const stepResult = await step.execute({ 
-            ...context,
-            text: result 
-          });
-          result = stepResult.content;
+            transformLogger.debug(`Checking step: ${step.constructor.name}`, {
+                currentTextLength: currentResult.content.length,
+                currentType: currentResult.type
+            });
 
-          transformLogger.debug(`Step completed: ${step.constructor.name}`, {
-            newTextLength: result.length,
-            resultType: stepResult.type
-          });
-        } else {
-          transformLogger.debug(`Step skipped: ${step.constructor.name} (not applicable)`);
+            const applicable = await this.checkStepApplicability(step, stepContext);
+            
+            if (applicable) {
+                transformLogger.debug(`Executing step: ${step.constructor.name}`);
+                
+                const stepResult = await step.execute(stepContext);
+                currentResult = stepResult;
+
+                transformLogger.debug(`Step completed: ${step.constructor.name}`, {
+                    newTextLength: stepResult.content.length,
+                    resultType: stepResult.type
+                });
+            } else {
+                transformLogger.debug(`Step skipped: ${step.constructor.name}`, {
+                    reason: 'Content not applicable for this transform step',
+                    contentLength: currentResult.content.length
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? 
+                error.message : 
+                'Unknown error';
+
+            transformLogger.error(`Step failed: ${step.constructor.name}`, {
+                error: errorMessage,
+                content: currentResult.content.substring(0, 100)
+            });
+            
+            throw new TransformError(
+                `Transform step failed (${step.constructor.name}): ${errorMessage}`
+            );
         }
-      } catch (error) {
-        transformLogger.error(`Step failed: ${step.constructor.name}`, error);
-        throw new TransformError(
-          `Transform step failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-      }
     }
 
     transformLogger.info('Transform execution completed', {
-      finalTextLength: result.length,
-      stepsExecuted: this.steps.length
+        finalTextLength: currentResult.content.length,
+        finalType: currentResult.type,
+        stepsExecuted: this.steps.length
     });
 
-    return { type: 'text', content: result };
+    return currentResult;
+}
+
+private async checkStepApplicability(
+    step: ITransformStep, 
+    context: TransformContext
+): Promise<boolean> {
+    try {
+        return step.isApplicable(context);
+    } catch (error) {
+        transformLogger.warn(`Applicability check failed: ${step.constructor.name}`, {
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return false;  // エラーの場合は安全のためfalse
+    }
   }
 }

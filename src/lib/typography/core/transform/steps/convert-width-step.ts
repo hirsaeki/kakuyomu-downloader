@@ -4,7 +4,7 @@ import type {
   TransformResult, 
   WidthTarget, 
   WidthDirection 
-} from '../base/types';
+} from '../types';
 import { TransformError } from '@/lib/errors';
 
 export class ConvertWidthStep extends BaseTransformStep {

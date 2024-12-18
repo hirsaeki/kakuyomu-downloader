@@ -3,7 +3,7 @@ import type {
   TransformContext, 
   TransformResult,
   ConversionRule
-} from '../base/types';
+} from '../types';
 import { TransformError } from '@/lib/errors';
 import { ConvertKanjiStep } from './convert-kanji-step';
 import { ConvertWidthStep } from './convert-width-step';
@@ -23,18 +23,29 @@ export class ConvertGroupsStep extends BaseTransformStep {
     this.widthConverter = new ConvertWidthStep('fullwidth', 'numbers');
   }
 
-  override isApplicable(context: TransformContext): boolean {
-    if (!super.isApplicable(context)) return false;
+  // steps/convert-groups-step.ts
+override isApplicable(context: TransformContext): boolean {
     if (!context.match) return false;
+    const match = context.match
 
-    // 全てのグループと対応するルールが適用可能かチェック
+    // まず全てのグループの存在チェック
+    const hasAllGroups = this.rules.every(({ group }) => {
+        const content = context.match?.[group];
+        return content !== undefined;
+    });
+    if (!hasAllGroups) return false;
+
+    // 親クラスのチェックは最後に
+    if (!super.isApplicable(context)) return false;
+
+    // 各グループの変換可能性チェック
     return this.rules.every(({ group, rule }) => {
-      const content = context.match?.[group];
-      if (content === undefined) return false;
+      const content = match[group];
+      if (content.length === 0) return true;  // 空文字列は変換可能とみなす
       
       return rule.type === 'toKanji' ? 
-        this.kanjiConverter.isApplicable({ text: content }) :
-        this.widthConverter.isApplicable({ text: content });
+          this.kanjiConverter.isApplicable({ text: content }) :
+          this.widthConverter.isApplicable({ text: content });
     });
   }
 

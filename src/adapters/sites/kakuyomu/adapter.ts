@@ -460,12 +460,21 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
    * 空白行のカウント
    */
   private countBlankLines(p: Element): number {
-    // brタグの数をカウント
-    const brCount = p.getElementsByTagName('br').length;
-    if (brCount > 0) return brCount;
-
-    // スペースのみの場合は1行
-    return 1;
+    // blankクラスを持つ場合
+    if (p.classList.contains('blank')) {
+      // brタグの数をカウント
+      const brCount = p.getElementsByTagName('br').length;
+      // brタグがある場合はその数を返す
+      if (brCount > 0) return brCount;
+      // brタグがない場合でもblankクラスがあれば1行として扱う
+      return 1;
+    }
+  
+    // 空白文字のみの場合も1行として扱う
+    if (p.textContent?.trim() === '') return 1;
+    
+    // それ以外は空行としない
+    return 0;
   }
 
   /**
@@ -515,32 +524,39 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
 
     let currentParagraph: string[] = [];
     const paragraphs: string[] = [];
-    let consecutiveBlankCount = 0;
+    let blankLineBuffer = 0;  // 空白行をバッファリング
 
-    nodes.forEach((node) => {
+    // 最後のノードを処理するためのヘルパー関数
+    const finalizeParagraph = () => {
+      if (currentParagraph.length > 0) {
+        paragraphs.push(`<p>${currentParagraph.join('')}</p>`);
+        currentParagraph = [];
+      }
+    };
+
+    nodes.forEach((node, index) => {
       if (node.type === 'blank') {
-        // 空白行は蓄積
-        consecutiveBlankCount += node.blankCount ?? 1;
+        // 空白行数を蓄積
+        blankLineBuffer += node.blankCount ?? 1;
       } else {
-        // 2行以上の空白で段落区切り
-        if (consecutiveBlankCount >= 2) {
-          if (currentParagraph.length > 0) {
-            paragraphs.push(`<p>${currentParagraph.join('')}</p>`);
-            currentParagraph = [];
-          }
-        } else if (consecutiveBlankCount === 1) {
-        // 1行分の空白は段落内2連続改行
-            currentParagraph.push('<br /><br />');
+        // テキストノードの処理
+        if (blankLineBuffer >= 2) {
+          // 2行以上の空白があれば段落を区切る
+          finalizeParagraph();
+        } else if (blankLineBuffer === 1 && currentParagraph.length > 0) {
+          // 1行の空白は段落内改行
+          currentParagraph.push('<br /><br />');
         }
+        
         currentParagraph.push(node.content);
-        consecutiveBlankCount = 0;
+        blankLineBuffer = 0;  // バッファをリセット
+      }
+
+      // 最後のノードの処理
+      if (index === nodes.length - 1) {
+        finalizeParagraph();
       }
     });
-
-    // 最後の段落
-    if (currentParagraph.length > 0) {
-      paragraphs.push(`<p>${currentParagraph.join('')}</p>`);
-    }
 
     adapterLogger.debug('EPUB用コンテンツの生成完了', {
       paragraphCount: paragraphs.length

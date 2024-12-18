@@ -1,10 +1,13 @@
 import JSZip from 'jszip';
-import { TextProcessor } from '@/lib/typography/core/processor';
 import { ValidationError } from '@/lib/errors/validation';
 import { GenerationError } from '@/lib/errors/generation';
+import { TypographyProcessor } from '@/lib/typography/core/processor';
+import { TypographyDOMOperator } from '@/lib/typography/core/dom';
+import { XHTMLDocumentBuilder } from './document-builder';
 import { InputChapter } from '../types';
 import EPUB_CONFIG from '@/config/epub';
 import { createContextLogger } from '@/lib/logger';
+import { patterns } from 'virtual:pattern-config';
 
 const contentLogger = createContextLogger('epub-content');
 
@@ -17,11 +20,16 @@ export interface GeneratedChapter {
 }
 
 export class ContentGenerator {
-  private readonly textProcessor: TextProcessor;
+  private readonly typographyProcessor: TypographyProcessor;
+  private readonly documentBuilder: XHTMLDocumentBuilder;
 
   constructor() {
     contentLogger.debug('ContentGeneratorを初期化');
-    this.textProcessor = TextProcessor.getInstance();
+    this.typographyProcessor = TypographyProcessor.getInstance(
+      Object.values(patterns),
+      new TypographyDOMOperator(document)
+    );
+    this.documentBuilder = new XHTMLDocumentBuilder(EPUB_CONFIG);
   }
 
   async generateChapters(
@@ -49,7 +57,7 @@ export class ContentGenerator {
           currentIndex: i,
           totalChapters: chapters.length
         });
-        throw new GenerationError('EPUB生成がタイムアウトしました');
+        throw new GenerationError('チャプター生成が中断されました');
       }
 
       // 進捗ログ（10チャプターごと）
@@ -114,22 +122,37 @@ export class ContentGenerator {
       chapterNum
     });
 
-    const convertedContent = await this.textProcessor.convertToXhtml(
-      chapter.data,
-      chapter.title
-    );
+    try {
+      // 1. 組版処理でDOMを構築
+      const processedContent = await this.typographyProcessor.process(chapter.data);
+      
+      // 2. 処理済みのコンテンツをXHTML構造に組み込む
+      const doc = this.documentBuilder.createDocument(chapter.title, processedContent);
+      
+      // 3. シリアライズしてZIPに追加
+      const serialized = new XMLSerializer().serializeToString(doc);
+      oebps.file(filename, serialized);
 
-    oebps.file(filename, convertedContent);
+      contentLogger.debug('チャプター変換完了', {
+        title: chapter.title,
+        filename
+      });
 
-    contentLogger.debug('チャプター変換完了', {
-      title: chapter.title,
-      filename
-    });
+      return {
+        filename,
+        title: chapter.title
+      };
 
-    return {
-      filename,
-      title: chapter.title
-    };
+    } catch (error) {
+      contentLogger.error('チャプター変換エラー', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message
+        } : 'Unknown error',
+        title: chapter.title
+      });
+      throw error;
+    }
   }
 
   private validateChapter(chapter: InputChapter, index: number): void {

@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../base/types';
+import type { TransformContext, TransformResult } from '../types';
 import { TransformError } from '@/lib/errors';
 
 export class SplitByStep extends BaseTransformStep {
