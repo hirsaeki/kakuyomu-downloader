@@ -99,12 +99,13 @@ export class TypographyProcessor {
       // サニタイズ処理
       const cleanHtml = this.sanitizeContent(html);
       
-      // DOM構築
-      const doc = new DOMParser().parseFromString(cleanHtml, 'text/html');
+      // template要素を使用してパース
+      const template = document.createElement('template');
+      template.innerHTML = cleanHtml;
       const fragment = document.createDocumentFragment();
 
       // 処理キューの初期化
-      const queue: ProcessingQueue[] = Array.from(doc.body.childNodes).map(node => ({
+      const queue: ProcessingQueue[] = Array.from(template.content.childNodes).map(node => ({
         node,
         parent: fragment,
         patterns: this.patterns
@@ -213,8 +214,9 @@ export class TypographyProcessor {
         );
 
         if (result) {
-          const { node, length } = result;
-          nodes.push(node);
+          const { nodes: patternNodes, length } = result;
+          patternNodes.forEach(node => nodes.push(node));
+
           ranges.add({
             start: currentPosition,
             end: currentPosition + length,
@@ -245,7 +247,7 @@ export class TypographyProcessor {
     executor: TransformExecutor,
     text: string,
     position: number
-  ): Promise<{ node: Node; length: number } | null> {
+  ): Promise<{ nodes: Node[]; length: number } | null> {
     try {
       // パターンのコンパイルと実行
       const regexp = new RegExp(pattern.pattern.source, pattern.pattern.flags);
@@ -271,13 +273,30 @@ export class TypographyProcessor {
         processedRanges: []
       });
 
+      // ノードの生成
+      const nodes: Node[] = [];
+
+      // 前方スペース（必要な場合）
+      if (pattern.transform.ensureSpace?.before) {
+        nodes.push(this.domOperator.createTextNode('　'));
+      }
+
       // 変換結果からノードを生成
-      const node = result.type === 'tcy'
-        ? this.domOperator.createTcyElement(result.content)
-        : this.domOperator.createTextNode(result.content);
+      if (result.type === 'tcy') {
+        // tcyの場合はspan要素を生成
+        nodes.push(this.domOperator.createTcyElement(result.content));
+      } else {
+        // 通常テキストの場合
+        nodes.push(this.domOperator.createTextNode(result.content));
+      }
+
+      // 後方スペース（必要な場合）
+      if (pattern.transform.ensureSpace?.after) {
+        nodes.push(this.domOperator.createTextNode('　'));
+      }
 
       return {
-        node,
+        nodes,
         length: match[0].length
       };
 
@@ -295,9 +314,11 @@ export class TypographyProcessor {
    */
   private sanitizeContent(html: string): string {
     return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: ['p', 'ruby', 'rt', 'rp'],
+      ALLOWED_TAGS: ['p', 'ruby', 'rt', 'rp', 'br', 'h1'],
       ALLOWED_ATTR: [],
-      KEEP_CONTENT: true
+      KEEP_CONTENT: true,
+      // HTML形式を保持するための設定
+      PARSER_MEDIA_TYPE: 'text/html'
     });
   }
 
@@ -308,7 +329,7 @@ export class TypographyProcessor {
     return [...patterns].sort((a, b) => {
       const priorityA = a.priority ?? 0;
       const priorityB = b.priority ?? 0;
-      return priorityB - priorityA;  // 降順
+      return priorityA - priorityB;  // 昇順
     });
   }
 

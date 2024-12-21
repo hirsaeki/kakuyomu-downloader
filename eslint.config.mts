@@ -1,12 +1,13 @@
+import tseslint from '@typescript-eslint/eslint-plugin';
+import eslintConfigPrettier from 'eslint-config-prettier';
+import tsParser from "@typescript-eslint/parser";
 import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
 import globals from 'globals';
 import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import eslintConfigPrettier from 'eslint-config-prettier';
+// @ts-expect-error - eslint-plugin-react-hooks does not have types
+import pluginReactHooks from 'eslint-plugin-react-hooks';
 
-export default tseslint.config(
-  // ベース設定
+export default [
   {
     ignores: [
       '**/node_modules/**',
@@ -17,96 +18,36 @@ export default tseslint.config(
       '.idea/**',
       '**/*.min.js',
       'src/components/ui/**',
-      // 生成ファイルを無視
       '**/generated/**',
     ],
   },
-
-  // JavaScript/TypeScript共通のベースルール
-  eslint.configs.recommended,
   {
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
-      ecmaVersion: 2024,
-      sourceType: 'module',
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-        ...globals.es2024,
-      },
+      parser: tsParser,
       parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
-    },
-    settings: {
-      react: {
-        version: 'detect',
+        project: ['./tsconfig.json', 'tsconfig.*.json'],
       },
     },
     plugins: {
-      'react': reactPlugin,
-      'react-hooks': reactHooksPlugin,
+      '@typescript-eslint': tseslint,
+      react: reactPlugin,
+      'react-hooks':pluginReactHooks, 
     },
     rules: {
-      // 一般的なルール
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-debugger': 'warn',
-      'no-alert': 'warn',
-
-      // React関連
-      'react/prop-types': 'off',
-      'react/jsx-uses-react': 'off',
-      'react/react-in-jsx-scope': 'off',
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      ...eslintConfigPrettier.rules,
+      ...tseslint.configs.recommended.rules,
+      ...reactPlugin.configs.recommended.rules,
+      ...pluginReactHooks.configs.recommended.rules,
     },
   },
-
-  // TypeScript特有の設定
-  ...tseslint.configs.recommended,
   {
-    files: ['**/*.ts', '**/*.tsx', '**/*.mts'],
+    files: ['**/*.js', '**/*.jsx'],
+    languageOptions: {
+      globals: globals.browser,
+    },
     rules: {
-      // TypeScript特有のルール
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-        },
-      ],
-      '@typescript-eslint/no-non-null-assertion': 'warn',
+      ...eslint.configs.recommended.rules,
     },
   },
-
-  // テストファイル用の設定
-  {
-    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'test/**/*.{ts,tsx}'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'off',
-    },
-  },
-
-  // サーバーコード用の設定
-  {
-    files: ['server/**/*.{ts,tsx,mts}'],
-    rules: {
-      'no-console': 'off', // サーバーではconsole.logを許可
-    },
-  },
-
-  // Viteプラグイン用の設定
-  {
-    files: ['src/vite-plugins/**/*.{ts,mts}'],
-    rules: {
-      'no-console': 'off', // ビルド時のログ出力を許可
-    },
-  },
-
-  // Prettier連携
-  eslintConfigPrettier,
-);
+];

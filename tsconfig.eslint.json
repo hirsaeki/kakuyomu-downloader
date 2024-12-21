@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ESNext",
+    "esModuleInterop": true,
+    "allowJs": true,
+    "noEmit": true,
+    "strict": true
+  },
+  "include": ["eslint.config.mts"]
+}

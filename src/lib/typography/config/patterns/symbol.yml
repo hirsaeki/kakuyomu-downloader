@@ -4,7 +4,7 @@ patterns:
   - name: doubleExclamationQuestion
     description: 2連続の感嘆符・疑問符を縦中横に変換し、spanタグを閉じたあとに全角スペースがあることを保証する。
     pattern:
-      source: "[!?！？]{2}"
+      source: "[!?！？]{2}[ 　]*"
       lookbehind: "(?<![!?！？])"
       lookahead: "(?![!?！？])"
     transform:
@@ -12,6 +12,9 @@ patterns:
       ensureSpace:
         after: true
       steps:
+        - action: replace
+          from: []
+          to: ""
         - action: convertWidth
           target: symbols
           direction: halfwidth
@@ -19,7 +22,7 @@ patterns:
   - name: otherExclamationQuestion
     description: 他の感嘆符・疑問符を全角化して、最後に全角スペース
     pattern:
-      source: "[!?！？]+　*"
+      source: "[!?！？]+[ 　]*"
       lookbehind: "(?<![!?！？])"
       lookahead: "(?![!?！？])"
     transform:
@@ -29,7 +32,7 @@ patterns:
           target: symbols
           direction: fullwidth
         - action: replace
-          from: "([！？]+　*)"
+          from: "([！？]+[ 　]*)"
           to: "$1　"
 
   - name: multipleDots

@@ -123,13 +123,16 @@ export class ContentGenerator {
     });
 
     try {
-      // 1. 組版処理でDOMを構築
-      const processedContent = await this.typographyProcessor.process(chapter.data);
+      // タイトルをh1タグとしてコンテンツに追加
+      const contentWithTitle = `<h1>${chapter.title}</h1>\n${chapter.data}`;
+
+      // 組版処理でDOMを構築
+      const processedContent = await this.typographyProcessor.process(contentWithTitle);
       
-      // 2. 処理済みのコンテンツをXHTML構造に組み込む
+      // 処理済みのコンテンツをXHTML構造に組み込む
       const doc = this.documentBuilder.createDocument(chapter.title, processedContent);
       
-      // 3. シリアライズしてZIPに追加
+      // シリアライズしてZIPに追加
       const serialized = new XMLSerializer().serializeToString(doc);
       oebps.file(filename, serialized);
 

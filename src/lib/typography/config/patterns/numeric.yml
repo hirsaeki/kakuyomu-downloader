@@ -29,8 +29,6 @@ patterns:
       lookahead: "(?![0-9０-９])"
     transform:
       type: tcy
-      ensureSpace:
-        after: false
       steps:
         - action: convertWidth
           target: numbers

@@ -6,25 +6,13 @@ import { NETWORK_CONFIG } from '@/config/constants';
 import { AppError, ValidationError, NetworkError } from '@/lib/errors';
 import { Episode } from '@/types';
 import { createContextLogger } from '@/lib/logger';
-import DOMPurify from 'dompurify';
+import { RubyProcessor } from '@/lib/html/ruby-processor';
+import { ParagraphProcessor } from '@/lib/html/paragraph-processor';
 
 const adapterLogger = createContextLogger('kakuyomu-adapter');
 
 // HTML文字列をそのまま受け取る
 type KakuyomuResponse = string;
-
-// 段落解析のための型定義
-interface RawNode {
-  type: 'text' | 'blank';
-  element: Element;
-  blankCount?: number;
-}
-
-interface CleanNode {
-  type: 'text' | 'blank';
-  content: string;
-  blankCount?: number;
-}
 
 export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
   readonly siteName = 'カクヨム';
@@ -45,6 +33,12 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     EPISODE_LINK: 'WorkTocSection_link',
     EPISODE_TITLE: 'WorkTocSection_title'
   } as const;
+
+  // 本文処理用のユーティリティクラス(静的インスタンス。)
+  private static readonly rubyProcessor = new RubyProcessor({
+    nestedRubyBehavior: 'ignore'  // ネストしたルビは無視してデバッグログに出力
+  });
+  private static readonly paragraphProcessor = new ParagraphProcessor();
 
   constructor() {
     const httpClient = new FetchHttpClient(
@@ -425,154 +419,14 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     };
   }
 
-  /**
- * DOM要素から段落構造を解析
- */
-  private parseStructure(element: Element): RawNode[] {
-    adapterLogger.debug('段落構造の解析開始');
-    
-    const nodes = Array.from(element.getElementsByTagName('p'))
-      .map(p => {
-        if (p.classList.contains('blank')) {
-          const count = this.countBlankLines(p);
-          adapterLogger.info('空白行を検出', { count });
-          return {
-            type: 'blank' as const,
-            element: p,
-            blankCount: count
-          };
-        }
-        return { 
-          type: 'text' as const,
-          element: p 
-        };
-      });
-
-    adapterLogger.debug('段落構造の解析完了', {
-      totalNodes: nodes.length,
-      blankLines: nodes.filter(n => n.type === 'blank').length
-    });
-
-    return nodes;
-  }
-
-  /**
-   * 空白行のカウント
-   */
-  private countBlankLines(p: Element): number {
-    // blankクラスを持つ場合
-    if (p.classList.contains('blank')) {
-      // brタグの数をカウント
-      const brCount = p.getElementsByTagName('br').length;
-      // brタグがある場合はその数を返す
-      if (brCount > 0) return brCount;
-      // brタグがない場合でもblankクラスがあれば1行として扱う
-      return 1;
-    }
-  
-    // 空白文字のみの場合も1行として扱う
-    if (p.textContent?.trim() === '') return 1;
-    
-    // それ以外は空行としない
-    return 0;
-  }
-
-  /**
-   * HTMLの安全化と改行の正規化
-   */
-  private sanitizeNodes(nodes: RawNode[]): CleanNode[] {
-    adapterLogger.debug('コンテンツのサニタイズ開始');
-
-    const config = {
-      ALLOWED_TAGS: ['ruby', 'rt', 'rp'],
-      ALLOWED_ATTR: [],
-      KEEP_CONTENT: true
-    };
-
-    const cleanNodes = nodes.map(node => {
-      if (node.type === 'blank') {
-        return {
-          type: 'blank' as const,
-          content: '',
-          blankCount: node.blankCount
-        };
-      }
-
-      const html = node.element.innerHTML;
-      const clean = DOMPurify.sanitize(html, config);
-      const withBreaks = clean.replace(/\n/g, '<br />');
-
-      return {
-        type: 'text' as const,
-        content: withBreaks
-      };
-    });
-
-    adapterLogger.debug('コンテンツのサニタイズ完了', {
-      inputNodes: nodes.length,
-      outputNodes: cleanNodes.length
-    });
-
-    return cleanNodes;
-  }
-
-  /**
-   * 最終的なEPUB用コンテンツの生成
-   */
-  private processContent(nodes: CleanNode[]): string {
-    adapterLogger.debug('EPUB用コンテンツの生成開始');
-
-    let currentParagraph: string[] = [];
-    const paragraphs: string[] = [];
-    let blankLineBuffer = 0;  // 空白行をバッファリング
-
-    // 最後のノードを処理するためのヘルパー関数
-    const finalizeParagraph = () => {
-      if (currentParagraph.length > 0) {
-        paragraphs.push(`<p>${currentParagraph.join('')}</p>`);
-        currentParagraph = [];
-      }
-    };
-
-    nodes.forEach((node, index) => {
-      if (node.type === 'blank') {
-        // 空白行数を蓄積
-        blankLineBuffer += node.blankCount ?? 1;
-      } else {
-        // テキストノードの処理
-        if (blankLineBuffer >= 2) {
-          // 2行以上の空白があれば段落を区切る
-          finalizeParagraph();
-        } else if (blankLineBuffer === 1 && currentParagraph.length > 0) {
-          // 1行の空白は段落内改行
-          currentParagraph.push('<br /><br />');
-        }
-        
-        currentParagraph.push(node.content);
-        blankLineBuffer = 0;  // バッファをリセット
-      }
-
-      // 最後のノードの処理
-      if (index === nodes.length - 1) {
-        finalizeParagraph();
-      }
-    });
-
-    adapterLogger.debug('EPUB用コンテンツの生成完了', {
-      paragraphCount: paragraphs.length
-    });
-
-    return paragraphs.join('\n');
-  }
-
   private parseEpisodeContent(doc: Document): { title: string; content: string } {
-  // タイトル要素のチェック
+    // タイトル要素のチェック
     const titleElement = doc.querySelector(KakuyomuAdapter.SELECTORS.CONTENT_TITLE);
     if (!titleElement?.textContent?.trim()) {
       adapterLogger.error('エピソードタイトルが不在または空');
       throw new AppError('エピソードタイトルが見つかりません', 'PARSER_ERROR');
     }
-
+  
     // 本文要素のチェック
     const contentElement = doc.querySelector(KakuyomuAdapter.SELECTORS.EPISODE_CONTENT);
     if (!contentElement) {
@@ -581,14 +435,11 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
       });
       throw new AppError('本文が見つかりません', 'PARSER_ERROR');
     }
-
+  
     try {
-      // 段落構造の解析
-      const rawNodes = this.parseStructure(contentElement);
-      // HTMLの安全化
-      const cleanNodes = this.sanitizeNodes(rawNodes);
-      // EPUBコンテンツの生成
-      const content = this.processContent(cleanNodes);
+      // RubyProcessorとParagraphProcessorを使用して本文を処理
+      const rubyProcessed = KakuyomuAdapter.rubyProcessor.process(contentElement.innerHTML);
+      const content = KakuyomuAdapter.paragraphProcessor.process(rubyProcessed);
 
       adapterLogger.info('エピソード内容解析完了', {
         title: titleElement.textContent.trim(),

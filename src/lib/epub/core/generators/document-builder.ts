@@ -21,9 +21,7 @@ export class XHTMLDocumentBuilder {
     <meta charset="${XML_ENCODING}" />
     <link rel="stylesheet" type="text/css" href="${this.config.FILE_STRUCTURE.STYLE}" />
   </head>
-  <body>
-    <h1>${this.escapeXml(title)}</h1>
-  </body>
+  <body></body>
 </html>`;
 
     const doc = new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');

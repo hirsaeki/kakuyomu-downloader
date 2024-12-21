@@ -26,12 +26,12 @@ export class RubyProcessor {
     placeholderFormat: (index: number) => `◆RUBY_${index}▲`
   };
 
-  private readonly options: Required<RubyProcessorOptions>;
+  private readonly options: RubyProcessorOptions;
 
   constructor(options?: RubyProcessorOptions) {
     this.options = {
       ...RubyProcessor.DEFAULT_OPTIONS,
-      ...options
+      ...(options || {})
     };
   }
 
@@ -56,10 +56,12 @@ export class RubyProcessor {
     }
 
     // Step 1: rubyタグを丸ごとプレースホルダーに置換
+    // DEFAULT_OPTIONSが定義済みなので、placeholderFormatは必ず存在することが保証されます
+    const placeholderFormat = (this.options?.placeholderFormat ?? RubyProcessor.DEFAULT_OPTIONS.placeholderFormat) as (index: number) => string;
     let content = html.replace(
       /<ruby[^>]*>.*?<\/ruby>/g,
       (match) => {
-        const placeholder = this.options.placeholderFormat(rubyTags.length);
+        const placeholder = placeholderFormat(rubyTags.length);
         rubyTags.push({
           placeholder,
           original: match
