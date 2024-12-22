@@ -185,6 +185,34 @@ export class TypographyProcessor {
     const ranges = new Set<ProcessedRange>();
     let currentPosition = 0;
 
+    // デバッグ情報の初期化
+    const debugInfo = {
+      text,
+      patterns: patterns.map(p => p.name),
+      ranges: [] as Array<{
+        start: number,
+        end: number,
+        pattern: string,
+        content: string
+      }>
+    };
+
+    typographyLogger.debug('Processing text content', debugInfo);
+
+    const addDebugRange = (start: number, end: number, pattern: string) => {
+      debugInfo.ranges.push({
+        start,
+        end,
+        pattern,
+        content: text.substring(start, end)
+      });
+      typographyLogger.debug('Range added', {
+        pattern,
+        content: text.substring(start, end),
+        position: { start, end }
+      });
+    };
+
     while (currentPosition < text.length) {
       // 処理済み範囲のスキップ
       const skipTo = this.findNextUnprocessedPosition(currentPosition, ranges);
@@ -216,12 +244,15 @@ export class TypographyProcessor {
         if (result) {
           const { nodes: patternNodes, length } = result;
           patternNodes.forEach(node => nodes.push(node));
-
-          ranges.add({
+    
+          const range = {
             start: currentPosition,
             end: currentPosition + length,
             pattern: pattern.name
-          });
+          };
+          ranges.add(range);
+          addDebugRange(range.start, range.end, range.pattern);
+          
           currentPosition += length;
           matched = true;
           break;

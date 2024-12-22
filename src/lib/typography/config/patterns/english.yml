@@ -20,7 +20,7 @@ patterns:
   - name: shortEnglishWord
     description: 1-3文字の英単語(頭alphabetのalphanumeric)は全角に変換
     pattern:
-      source: "([a-zA-Zａ-ｚＡ-Ｚ][0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{,2})"
+      source: "([a-zA-Zａ-ｚＡ-Ｚ][0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{0,2})"
       lookbehind: "(?<![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])"
       lookahead: "(?![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])"
     transform:

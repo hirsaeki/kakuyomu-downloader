@@ -7,7 +7,7 @@ patterns:
       例: ^"こんにちは。" → 　「こんにちは」
       例: ^"こんにちは" → 　「こんにちは」
     pattern:
-      source: ^(["”])([^"”。]+)。?}\\1
+      source: ^(["”])([^"”。]+)。?)\\1
       flags: "gm"
     transform:
       type: text
@@ -93,17 +93,16 @@ patterns:
         - action: replace
           from: "。([」』])"
           to: "$1"
-
-  - name: lineStartBrackets
-    description: |
-      行頭のカギカッコ類に二分アキを挿入
-      例: ^「こんにちは」 → 　「こんにちは」
-      例: ^『こんにちは』 → 　『こんにちは』
-    pattern:
-      source: "^([「『])"
-      flags: "gm"
-    transform:
-      type: text
-      steps:
-        - action: wrap
-          prefix: "　"
+#  - name: lineStartBrackets
+#    description: |
+#      行頭のカギカッコ類に二分アキを挿入
+#      例: ^「こんにちは」 → 　「こんにちは」
+#      例: ^『こんにちは』 → 　『こんにちは』
+#    pattern:
+#      source: "^([「『])"
+#      flags: "gm"
+#    transform:
+#      type: text
+#      steps:
+#        - action: wrap
+#          prefix: "　"
