@@ -1,7 +1,7 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { 
   TransformContext, 
-  TransformResult,
+  ProcessedText,
   ConversionRule
 } from '../types';
 import { TransformError } from '@/lib/errors';
@@ -49,7 +49,7 @@ override isApplicable(context: TransformContext): boolean {
     });
   }
 
-  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     const { match } = context;
     if (!match) {
       throw new TransformError('Invalid context: match is required');

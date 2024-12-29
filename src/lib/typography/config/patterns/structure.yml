@@ -1,13 +1,15 @@
 description: 基本的な文章構造に関するパターン（引用符、段落など）
 basePriority: 100
 patterns:
-  - name: lineStartDoubleQuotes
+  - name: lineWithHeadingQuotes
     description: |
-      行頭の句点付き二重引用符を処理(句点があれば削除)
-      例: ^"こんにちは。" → 　「こんにちは」
-      例: ^"こんにちは" → 　「こんにちは」
+      引用符行を処理(行頭字下げなし、句点があれば削除)
+      例: ^　"こんにちは。" → 「こんにちは」
+      例: ^　"こんにちは" → 「こんにちは」
+      例: ^　'こんにちは。' → 『こんにちは』
+      例: ^　'こんにちは' → 『こんにちは』
     pattern:
-      source: ^(["”])([^"”。]+)。?)\\1
+      source: ^[\\t 　]*(["”'’])(.*?)。?\\1
       flags: "gm"
     transform:
       type: text
@@ -15,70 +17,60 @@ patterns:
         - action: processGroup
           group: 2
         - action: replace
-          from: [\"”]
-          to: ""
-        - action: wrap
-          prefix: "　「"
-          suffix: "」"
-
-  - name: lineStartSingleQuotes
-    description: |
-      行頭の句点付き一重引用符を処理(句点があれば削除)
-      例: ^'こんにちは。' → 　『こんにちは』
-      例: ^'こんにちは' → 　『こんにちは』
-    pattern:
-      source: ^(['’])([^'’。]+)。?\\1
-      flags: "gm"
-    transform:
-      type: text
-      steps:
-        - action: processGroup
-          group: 2
-        - action: replace
-          from: 。?['’]
-          to: ""
-        - action: wrap
-          prefix: "　『"
-          suffix: "』"
-
-  - name: lineStartSingleBracket
-    description: |
-      行頭のカギカッコを処理(句点があれば削除)
-      例: ^「こんにちは。」 → 　「こんにちは」
-      例: ^「こんにちは」 → 　「こんにちは」
-    pattern:
-      source: ^「([^」。]+)。?」
-      flags: "gm"
-    transform:
-      type: text
-      steps:
-        - action: processGroup
-          group: 1
-        - action: replace
-          from: "。」"
+          from: (?<!。)。?["”]$
           to: "」"
-        - action: wrap
-          prefix: "　"
-
-  - name: lineStartDoubleBracket
-    description: |
-      行頭の二重カギカッコを処理(句点があれば削除)
-      例: ^『こんにちは。』 → 　『こんにちは』
-      例: ^『こんにちは』 → 　『こんにちは』
-    pattern:
-      source: "^『([^』。]+)。?』"
-      flags: "gm"
-    transform:
-      type: text
-      steps:
-        - action: processGroup
-          group: 1
         - action: replace
-          from: "。』"
-          to: "』"
-        - action: wrap
-          prefix: "　"
-          suffix: ""
+          from: (?<!。)。['’]$
+          to: 』
+        - action: replace
+          from: ^[\\t 　]*["”]
+          to: "「"
+        - action: replace
+          from: ^[\\t 　]*['’]
+          to: "『"
+
+  #  - name: lineWithHeadingBracket
+  #    description: |
+  #      カギカッコ行を処理(行頭二分アキ、句点があれば削除)
+  #      例: ^「こんにちは。」 → 　「こんにちは」
+  #      例: ^「こんにちは」 → 　「こんにちは」
+  #      例: ^『こんにちは。』 → 　『こんにちは』
+  #      例: ^『こんにちは』 → 　『こんにちは』
+  #    pattern:
+  #      source: ^[\\s　]*「(.*)」|^[\\s　]*『(.*)』
+  #      flags: "gm"
+  #    transform:
+  #      type: text
+  #      steps:
+  #        - action: processGroup
+  #          group: 1
+  #        - action: processGroup
+  #          group: 2
+  #        - action: replace
+  #          from: (?<!。)。([」』])
+  #          to: "$2"
+  #        - action: replace
+  #          from: ^[\\s　]*([「『])
+  #          to: "　$1"
+  #  - name: lineStartDoubleBracket
+  #    description: |
+  #      カギカッコを処理(句点があれば削除)
+  #      例: ^『こんにちは。』 → 　『こんにちは』
+  #      例: ^『こんにちは』 → 　『こんにちは』
+  #    pattern:
+  #      source: "^『([^』。]+)。?』"
+  #      flags: "gm"
+  #    transform:
+  #      type: text
+  #      steps:
+  #        - action: processGroup
+  #          group: 1
+  #        - action: replace
+  #          from: 。』
+  #          to: 』
+  #        - action: wrap
+  #          prefix: "　"
+  #          suffix: ""
 
   - name: periodsBeforeClosingBrackets
     description: |
@@ -93,16 +85,32 @@ patterns:
         - action: replace
           from: "。([」』])"
           to: "$1"
-#  - name: lineStartBrackets
-#    description: |
-#      行頭のカギカッコ類に二分アキを挿入
-#      例: ^「こんにちは」 → 　「こんにちは」
-#      例: ^『こんにちは』 → 　『こんにちは』
-#    pattern:
-#      source: "^([「『])"
-#      flags: "gm"
-#    transform:
-#      type: text
-#      steps:
-#        - action: wrap
-#          prefix: "　"
+
+  - name: lineStartBrackets
+    description: |
+      行頭のカギカッコ類は字下げしない
+      例: ^　「こんにちは」 → 「こんにちは」
+      例: ^　『こんにちは』 → 『こんにちは』
+    pattern:
+      source: "^[\\t 　]*([「『])"
+      flags: "gm"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "^[\\t 　]*"
+          to: ""
+
+  - name: lineStartIndent
+    description: |
+      行頭字下げ
+      例: ^こんにちは → 　こんにちは
+    pattern:
+      source: "^[\\t 　]*"
+      flags: "gm"
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: "^[\\t 　]*"
+          to: "　"

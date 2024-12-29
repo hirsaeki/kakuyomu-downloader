@@ -1,5 +1,7 @@
 import { createContextLogger } from '@/lib/logger';
 
+const paragraphLogger = createContextLogger('paragraph-processor');
+
 interface ParagraphProcessorOptions {
   /** 段落区切りと看做す最小の空行数（デフォルト: 2） */
   minEmptyLines?: number;
@@ -12,7 +14,6 @@ interface ParagraphProcessorOptions {
  */
 class ParagraphProcessor {
   private readonly options: Required<ParagraphProcessorOptions>;
-  private readonly logger;
 
   constructor(options: ParagraphProcessorOptions = {}) {
     this.options = {
@@ -20,8 +21,6 @@ class ParagraphProcessor {
       debug: false,
       ...options
     };
-
-    this.logger = createContextLogger('ParagraphProcessor');
   }
 
   /**
@@ -31,7 +30,7 @@ class ParagraphProcessor {
    */
   process(text: string): string {
     if (!text) {
-      this.logger.debug('Empty text provided, returning as is');
+      paragraphLogger.debug('Empty text provided, returning as is');
       return text;
     }
 
@@ -76,7 +75,7 @@ class ParagraphProcessor {
     const result = processedLines.join('\n\n');
 
     if (this.options.debug) {
-      this.logger.debug('Processed text:', {
+      paragraphLogger.debug('Processed text:', {
         originalLength: text.length,
         processedLength: result.length,
         paragraphCount: processedLines.length
@@ -87,10 +86,10 @@ class ParagraphProcessor {
   }
 
   /**
-   * テキストを<p>タグで囲む
+   * テキストを<p>タグで囲む 段落開始一字下げ
    */
   private wrapParagraph(text: string): string {
-    return `<p>${text}</p>`;
+    return `<p>\n${text}\n</p>`;
   }
 }
 

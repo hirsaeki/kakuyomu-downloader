@@ -364,7 +364,8 @@ export const useNovelDownloader = (factory: NovelSiteAdapterFactory) => {
 
       const epubGenerator = new EPUBGenerator();
       const blob = await epubGenerator.generateEPUB(inputChapters, metadata, {
-        aborted: signal.aborted
+        aborted: signal.aborted,
+        useGroupTitles: state.showGroupTitles
       });
 
       // ファイルの保存

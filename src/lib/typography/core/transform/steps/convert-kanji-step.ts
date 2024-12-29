@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../types';
+import type { TransformContext, ProcessedText } from '../types';
 import { TransformError } from '@/lib/errors';
 
 /**
@@ -13,7 +13,7 @@ export class ConvertKanjiStep extends BaseTransformStep {
     return !isNaN(parseInt(context.text, 10));  // 数値変換可能性をチェック
   }
 
-  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     try {
       const num = parseInt(context.text, 10);
       const converted = num.toString()

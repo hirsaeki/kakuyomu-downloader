@@ -1,7 +1,7 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { 
   TransformContext, 
-  TransformResult, 
+  ProcessedText, 
   WidthTarget, 
   WidthDirection 
 } from '../types';
@@ -48,7 +48,7 @@ export class ConvertWidthStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({ text }: TransformContext): Promise<TransformResult> {
+  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
     if (!this.isApplicable({ text })) {
       throw new TransformError('Invalid text content for ConvertWidthStep');
     }

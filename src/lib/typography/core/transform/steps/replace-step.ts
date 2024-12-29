@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../types';
+import type { TransformContext, ProcessedText } from '../types';
 import { TransformError } from '@/lib/errors';
 
 /**
@@ -25,7 +25,7 @@ export class ReplaceStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     try {
       // KISS: シンプルなreplace操作のみ
       const result = context.text.replace(this.pattern, this.to);

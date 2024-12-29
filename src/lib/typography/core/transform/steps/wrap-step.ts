@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../types';
+import type { TransformContext, ProcessedText } from '../types';
 
 export class WrapStep extends BaseTransformStep {
   constructor(
@@ -9,7 +9,7 @@ export class WrapStep extends BaseTransformStep {
     super();
   }
 
-  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     return this.createResult(`${this.prefix}${context.text}${this.suffix}`);
   }
 

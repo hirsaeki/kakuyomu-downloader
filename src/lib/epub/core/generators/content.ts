@@ -9,6 +9,10 @@ import EPUB_CONFIG from '@/config/epub';
 import { createContextLogger } from '@/lib/logger';
 import { patterns } from 'virtual:pattern-config';
 
+interface ContentGeneratorOptions {
+  useGroupTitles?: boolean;
+}
+
 const contentLogger = createContextLogger('epub-content');
 
 /**
@@ -19,6 +23,9 @@ export interface GeneratedChapter {
   title: string;
 }
 
+/**
+ * Enhanced content generator with improved error handling and content validation
+ */
 export class ContentGenerator {
   private readonly typographyProcessor: TypographyProcessor;
   private readonly documentBuilder: XHTMLDocumentBuilder;
@@ -32,10 +39,14 @@ export class ContentGenerator {
     this.documentBuilder = new XHTMLDocumentBuilder(EPUB_CONFIG);
   }
 
+  /**
+   * Generates EPUB chapters
+   */
   async generateChapters(
     zip: JSZip,
     chapters: InputChapter[],
-    aborted: boolean = false
+    aborted: boolean = false,
+    options?: ContentGeneratorOptions
   ): Promise<GeneratedChapter[]> {
     contentLogger.info('チャプター生成を開始', {
       chaptersCount: chapters.length
@@ -74,7 +85,11 @@ export class ContentGenerator {
 
       try {
         await this.validateChapter(chapter, i);
-        const generated = await this.generateChapter(chapter, i, oebps);
+        const displayTitle = options?.useGroupTitles && chapter.metadata?.groupTitle
+          ? `${chapter.metadata.groupTitle} ${chapter.title}`
+          : chapter.title;
+        const generated = await this.generateChapter(chapter, i, oebps, displayTitle);
+
         generatedChapters.push(generated);
 
       } catch (error) {
@@ -86,7 +101,8 @@ export class ContentGenerator {
           } : 'Unknown error',
           chapter: {
             index: i + 1,
-            title: chapter.title
+            title: chapter.title,
+            dataLength: chapter.data.length
           }
         });
         throw new GenerationError(
@@ -109,36 +125,73 @@ export class ContentGenerator {
     return generatedChapters;
   }
 
+  /**
+   * Generates a single chapter
+   */
   private async generateChapter(
     chapter: InputChapter,
     index: number,
-    oebps: JSZip
+    oebps: JSZip,
+    displayTitle?: string
   ): Promise<GeneratedChapter> {
     const chapterNum = (index + 1).toString().padStart(3, '0');
     const filename = `${EPUB_CONFIG.FILE_STRUCTURE.CHAPTER_PREFIX}${chapterNum}.xhtml`;
 
     contentLogger.debug('チャプター変換開始', {
       title: chapter.title,
-      chapterNum
+      chapterNum,
+      dataLength: chapter.data.length
     });
 
     try {
-      // タイトルをh1タグとしてコンテンツに追加
-      const contentWithTitle = `<h1>${chapter.title}</h1>\n${chapter.data}`;
+      // Prepare content with title
+      const cleanTitle = this.sanitizeContent(displayTitle ?? chapter.title);
+      const cleanContent = this.sanitizeContent(chapter.data);
+      const contentWithTitle = `<h1>${cleanTitle}</h1>\n${cleanContent}`;
 
-      // 組版処理でDOMを構築
+      contentLogger.debug('コンテンツ準備完了', {
+        contentLength: contentWithTitle.length,
+        firstChars: contentWithTitle.substring(0, 100)
+      });
+
+      // Process typography
       const processedContent = await this.typographyProcessor.process(contentWithTitle);
+
+      contentLogger.debug('Typography処理完了', {
+        type: processedContent instanceof DocumentFragment ? 'DocumentFragment' : typeof processedContent,
+        hasChildNodes: processedContent instanceof DocumentFragment && processedContent.hasChildNodes(),
+        childCount: processedContent instanceof DocumentFragment ? processedContent.childNodes.length : 'N/A'
+      });
       
-      // 処理済みのコンテンツをXHTML構造に組み込む
+      // Create and validate document
       const doc = this.documentBuilder.createDocument(chapter.title, processedContent);
       
-      // シリアライズしてZIPに追加
+      // Additional debug information
+      const contentDiv = doc.querySelector('.content');
+      contentLogger.debug('ドキュメント生成後の状態', {
+        hasContentDiv: !!contentDiv,
+        hasContent: contentDiv?.hasChildNodes(),
+        contentLength: contentDiv?.textContent?.length,
+        firstChars: contentDiv?.textContent?.substring(0, 100)
+      });
+
+      if (!contentDiv?.hasChildNodes()) {
+        throw new Error('Generated document has no content');
+      }
+      
+      // Serialize and add to ZIP
       const serialized = new XMLSerializer().serializeToString(doc);
+      if (!serialized || serialized.indexOf('<div class="content"></div>') !== -1) {
+        throw new Error('Content serialization failed - empty result');
+      }
+      
       oebps.file(filename, serialized);
 
       contentLogger.debug('チャプター変換完了', {
         title: chapter.title,
-        filename
+        filename,
+        serializedLength: serialized.length,
+        firstChars: serialized.substring(0, 100)
       });
 
       return {
@@ -150,14 +203,19 @@ export class ContentGenerator {
       contentLogger.error('チャプター変換エラー', {
         error: error instanceof Error ? {
           name: error.name,
-          message: error.message
+          message: error.message,
+          stack: error.stack
         } : 'Unknown error',
-        title: chapter.title
+        title: chapter.title,
+        dataLength: chapter.data.length
       });
       throw error;
     }
   }
 
+  /**
+   * Validates chapter data
+   */
   private validateChapter(chapter: InputChapter, index: number): void {
     if (!chapter.title?.trim()) {
       contentLogger.warn('無効なチャプター: タイトルが空', { index: index + 1 });
@@ -174,5 +232,27 @@ export class ContentGenerator {
         `Chapter ${index + 1}: コンテンツが空です`,
       );
     }
+
+    contentLogger.debug('チャプターバリデーション完了', {
+      index: index + 1,
+      title: chapter.title,
+      dataLength: chapter.data.length
+    });
+  }
+
+  /**
+   * Sanitizes content strings
+   */
+  private sanitizeContent(content: string): string {
+    const sanitized = content
+      .trim()
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '') // Remove invalid XML characters
+      .replace(/\r\n|\r/g, '\n'); // Normalize line endings
+
+    if (!sanitized) {
+      throw new Error('Content sanitization resulted in empty string');
+    }
+
+    return sanitized;
   }
 }

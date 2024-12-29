@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../types';
+import type { TransformContext, ProcessedText } from '../types';
 import { TransformError } from '@/lib/errors';
 
 export class SplitByStep extends BaseTransformStep {
@@ -15,7 +15,7 @@ export class SplitByStep extends BaseTransformStep {
     return this.separators.some(sep => context.text.includes(sep));  // 区切り文字の存在確認
   }
 
-  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     try {
       let parts: string[] = [context.text];
       

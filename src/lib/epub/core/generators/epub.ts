@@ -37,6 +37,7 @@ export class EPUBGenerator {
     options: {
       uuid?: string;
       aborted?: boolean;
+      useGroupTitles?: boolean;
     } = {}
   ): Promise<Blob> {
     const uuid = options.uuid ?? generateUUID();
@@ -65,7 +66,10 @@ export class EPUBGenerator {
       const generatedChapters = await this.contentGenerator.generateChapters(
         zip,
         chapters,
-        options.aborted
+        options.aborted,
+        {
+          useGroupTitles: options?.useGroupTitles ?? false
+        }
       );
       epubLogger.debug('チャプター生成完了', {
         generatedCount: generatedChapters.length

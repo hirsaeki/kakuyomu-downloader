@@ -1,5 +1,5 @@
 import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, TransformResult } from '../types';
+import type { TransformContext, ProcessedText } from '../types';
 import { TransformError } from '@/lib/errors';
 
 export class JoinStep extends BaseTransformStep {
@@ -22,7 +22,7 @@ export class JoinStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform(context: TransformContext): Promise<TransformResult> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     try {
       let parts: string[];
       try {

@@ -1,4 +1,4 @@
-import type { ITransformStep, TransformContext, TransformResult } from '../types';
+import type { ITransformStep, TransformContext, ProcessedText } from '../types';
 import { TransformError } from '@/lib/errors';
 import { createContextLogger } from '@/lib/logger';
 
@@ -33,12 +33,10 @@ export abstract class BaseTransformStep implements ITransformStep {
 
     return applicable;
   }
-  //old
 
-  async execute(context: TransformContext): Promise<TransformResult> {
+  async execute(context: TransformContext): Promise<ProcessedText> {
     stepLogger.debug(`${this.name}: Starting execution`, {
-      textLength: context.text?.length ?? 0,
-      processedRanges: context.processedRanges?.length ?? 0
+      textLength: context.text?.length ?? 0
     });
 
     try {
@@ -50,7 +48,6 @@ export abstract class BaseTransformStep implements ITransformStep {
       const result = await this.processTransform(context);
 
       stepLogger.debug(`${this.name}: Execution completed`, {
-        resultType: result.type,
         resultLength: result.content.length
       });
 
@@ -72,14 +69,18 @@ export abstract class BaseTransformStep implements ITransformStep {
    * 実際の変換処理を実装するメソッド
    * サブクラスでオーバーライドする
    */
-  protected abstract processTransform(context: TransformContext): Promise<TransformResult>;
+  protected abstract processTransform(context: TransformContext): Promise<ProcessedText>;
 
-  protected createResult(content: string, type: 'text' | 'tcy' = 'text'): TransformResult {
+  /**
+   * 変換結果を生成するヘルパーメソッド
+   * typeが未指定の場合は、コンテキストのtargetTypeを使用し、
+   * それも未定義の場合はtextをデフォルトとして使用
+   */
+  protected createResult(content: string): ProcessedText {
     stepLogger.debug(`${this.name}: Creating result`, {
-      type,
       contentLength: content.length
     });
 
-    return { type, content };
+    return { content };
   }
 }

@@ -45,4 +45,56 @@ export class BaseDOMOperator implements DOMElementCreator {
       );
     }
   }
+
+  createDocumentFragment(): DocumentFragment {
+    try {
+      return this.doc.createDocumentFragment();
+    } catch {
+      throw new DOMError('Failed to create document fragment');
+    }
+  }
+
+  createTreeWalker(
+    root: Node,
+    whatToShow: number,
+    filter: NodeFilter | null
+  ): TreeWalker {
+    try {
+      return this.doc.createTreeWalker(root, whatToShow, filter);
+    } catch {
+      throw new DOMError('Failed to create tree walker');
+    }
+  }
+
+  replaceChild(parent: Node, newChild: Node, oldChild: Node): Node {
+    try {
+      return parent.replaceChild(newChild, oldChild);
+    } catch {
+      throw new DOMError('Failed to replace child node');
+    }
+  }
+
+  appendChild(parent: Node, child: Node): Node {
+    try {
+      return parent.appendChild(child);
+    } catch {
+      throw new DOMError('Failed to append child node');
+    }
+  }
+
+    createTemplate(): HTMLTemplateElement {
+    try {
+      return this.doc.createElement('template') as HTMLTemplateElement;
+    } catch {
+      throw new DOMError('Failed to create template element');
+    }
+  }
+
+  cloneNode(node: Node, deep = false): Node {
+    try {
+      return node.cloneNode(deep);
+    } catch {
+      throw new DOMError('Failed to clone node');
+    }
+  }
 }

@@ -51,3 +51,6 @@ __snapshots__/
 /*.keep
 /*.xpi
 /main_key.asc
+
+# temporary fixture
+src/fix/

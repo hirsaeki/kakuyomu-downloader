@@ -1,9 +1,10 @@
-import { Plugin } from 'vite';
+import { Plugin, HmrContext } from 'vite';
 import * as yaml from 'js-yaml';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { ValidationError, PatternError } from '../lib/errors';
 import { createLogger } from '../lib/logger';
+import chalk from 'chalk';
 
 const patternLogger = createLogger('PatternManager');
 
@@ -63,7 +64,8 @@ interface PatternDefinition {
 function validatePattern(
   pattern: unknown, 
   file: string,
-  parentPriority: number = 0
+  parentPriority: number = 0,
+  index: number = 0
 ): PatternDefinition['patterns'][0] {
   try {
     const p = pattern as PatternDefinition['patterns'][0];
@@ -101,12 +103,15 @@ function validatePattern(
     });
 
     // 優先度の計算
-    p.priority = (p.priority ?? 0) + parentPriority;
+    p.priority = Math.round(
+      ((p.priority ?? 0) + parentPriority + (index * 0.001)) * 1000
+    ) / 1000;
 
     patternLogger.debug('Pattern validation passed', {
       name: p.name,
       file,
-      priority: p.priority
+      priority: p.priority,
+      arrayindex: index,
     });
 
     return p;
@@ -148,6 +153,7 @@ export function yamlPatternTransformerPlugin(options: TransformerOptions = {}): 
 
   let projectRoot: string;
   let patternsPath: string;
+  let lastPatternCount = 0; // 最後に読み込まれたパターン数を記録
 
   return {
     name: 'yaml-pattern-transformer',
@@ -175,6 +181,25 @@ export function yamlPatternTransformerPlugin(options: TransformerOptions = {}): 
       }
     },
 
+    handleHotUpdate(ctx: HmrContext) {
+      // YAMLファイルの変更のみを処理
+      if (ctx.file.endsWith('.yml') && ctx.file.includes(DEFAULT_PATTERNS_DIR)) {
+        const filename = ctx.file.split('/').pop() || ctx.file;
+        console.log(
+          `\n${chalk.bgBlue.white(' PATTERN ')} ${chalk.blue('File changed:')} ${chalk.cyan(filename)}`
+        );
+        
+        // モジュールの再読み込みをトリガー
+        const mod = ctx.server.moduleGraph.getModuleById(resolvedVirtualModuleId);
+        if (mod) {
+          ctx.server.moduleGraph.invalidateModule(mod);
+          return [mod];
+        }
+        
+        return [];
+      }
+    },
+
     async load(id) {
       if (id === resolvedVirtualModuleId) {
         const patterns: Record<string, PatternDefinition['patterns'][0]> = {};
@@ -193,11 +218,12 @@ export function yamlPatternTransformerPlugin(options: TransformerOptions = {}): 
               const yamlContent = loadYamlPatterns(fullPath);
               const basePriority = yamlContent.basePriority ?? 0;
 
-              yamlContent.patterns.forEach(pattern => {
+              yamlContent.patterns.forEach((pattern, index) => {
                 const validatedPattern = validatePattern(
                   pattern,
                   file,
-                  basePriority
+                  basePriority,
+                  index
                 );
                 patterns[validatedPattern.name] = validatedPattern;
               });
@@ -214,6 +240,19 @@ export function yamlPatternTransformerPlugin(options: TransformerOptions = {}): 
             }
           }
 
+          const currentPatternCount = Object.keys(patterns).length;
+          
+          // 開発時のみパターン数の変更を報告
+          if (process.env.NODE_ENV === 'development' && currentPatternCount !== lastPatternCount) {
+            console.log(
+              `\n${chalk.bgBlue.white(' PATTERN ')} ${chalk.blue('Module updated:')} ` +
+              `${chalk.green(`${currentPatternCount} patterns loaded`)}` +
+              (warnings.length > 0 ? chalk.yellow(` (${warnings.length} warnings)`) : '')
+            );
+          }
+          
+          lastPatternCount = currentPatternCount;
+
           // 型定義を含まないJavaScriptコードを生成
           const result = `
             export const patterns = ${JSON.stringify(patterns, null, 2)};
@@ -224,7 +263,7 @@ export function yamlPatternTransformerPlugin(options: TransformerOptions = {}): 
           `.trim();
 
           patternLogger.info('Generated pattern module', {
-            patternsCount: Object.keys(patterns).length,
+            patternsCount: currentPatternCount,
             warningsCount: warnings.length
           });
 
