@@ -4,6 +4,10 @@ import { createContextLogger } from '@/lib/logger';
 
 const stepLogger = createContextLogger('typography-step');
 
+/**
+ * 変換ステップの基底クラス
+ * テキストベースの変換処理を提供する
+ */
 export abstract class BaseTransformStep implements ITransformStep {
   private readonly name: string;
 
@@ -11,29 +15,35 @@ export abstract class BaseTransformStep implements ITransformStep {
     this.name = this.constructor.name;
   }
 
+  /**
+   * コンテキストが変換可能かどうかを判定
+   * @param context 変換コンテキスト
+   * @returns 変換可能な場合はtrue
+   */
   isApplicable(context: TransformContext): boolean {
     if (!context) {
-        stepLogger.error(`${this.name}: Invalid context provided`);
-        throw new TransformError('変換コンテキストが指定されていません');
+      stepLogger.error(`${this.name}: Invalid context provided`);
+      throw new TransformError('変換コンテキストが指定されていません');
     }
 
-    // textプロパティの存在と型のチェック
+    // テキストの存在と型のチェック
     if (typeof context.text !== 'string') {
-        stepLogger.debug(`${this.name}: Invalid text property type`);
-        return false;
+      stepLogger.debug(`${this.name}: Invalid text property type`);
+      return false;
     }
 
-    // 変換可能性の判定（空文字列は変換可能とする）
-    const applicable = true;
-    
     stepLogger.debug(`${this.name}: Checking applicability`, {
-        applicable,
-        textLength: context.text.length
+      textLength: context.text.length
     });
 
-    return applicable;
+    return true;
   }
 
+  /**
+   * 変換処理を実行
+   * @param context 変換コンテキスト
+   * @returns 処理後のテキスト
+   */
   async execute(context: TransformContext): Promise<ProcessedText> {
     stepLogger.debug(`${this.name}: Starting execution`, {
       textLength: context.text?.length ?? 0
@@ -48,7 +58,7 @@ export abstract class BaseTransformStep implements ITransformStep {
       const result = await this.processTransform(context);
 
       stepLogger.debug(`${this.name}: Execution completed`, {
-        resultLength: result.content.length
+        resultLength: result.textContent.length
       });
 
       return result;
@@ -68,19 +78,21 @@ export abstract class BaseTransformStep implements ITransformStep {
   /**
    * 実際の変換処理を実装するメソッド
    * サブクラスでオーバーライドする
+   * @param context 変換コンテキスト
+   * @returns 処理後のテキスト
    */
   protected abstract processTransform(context: TransformContext): Promise<ProcessedText>;
 
   /**
    * 変換結果を生成するヘルパーメソッド
-   * typeが未指定の場合は、コンテキストのtargetTypeを使用し、
-   * それも未定義の場合はtextをデフォルトとして使用
+   * @param text 処理後のテキスト
+   * @returns ProcessedText形式の結果
    */
-  protected createResult(content: string): ProcessedText {
+  protected createResult(text: string): ProcessedText {
     stepLogger.debug(`${this.name}: Creating result`, {
-      contentLength: content.length
+      textLength: text.length
     });
 
-    return { content };
+    return { textContent: text };
   }
 }

@@ -6,7 +6,8 @@ export type TransformAction =
   | 'replace'
   | 'splitBy'
   | 'convertEach'
-  | 'join';
+  | 'join'
+  | 'wrap';
 
 /**
  * 文字幅変換の対象
@@ -46,10 +47,9 @@ export interface ITransformStep {
  */
 export interface TransformStepDefinition {
   action: TransformAction;
-  // 各アクション用の設定
   // convertWidth用設定
-  target?: 'numbers' | 'alphabet' | 'symbols';
-  direction?: 'fullwidth' | 'halfwidth';
+  target?: WidthTarget;
+  direction?: WidthDirection;
 
   // replace用設定
   from?: string;
@@ -59,20 +59,23 @@ export interface TransformStepDefinition {
   separator?: string | string[];
 
   // convertEach用設定
-  rules?: Array<{
-    type: 'toKanji' | 'toFullwidth';
-    params?: Record<string, unknown>;
-  }>;
+  rules?: ConversionRule[];
 
   // join用設定
   with?: string;
+
+  // wrap用設定
+  prefix?: string;
+  suffix?: string;
 }
 
 /**
  * 変換処理のコンテキスト
  */
 export interface TransformContext {
+  // 変換対象のテキスト
   text: string;
+  // 正規表現マッチ結果（オプショナル）
   match?: RegExpMatchArray;
 }
 
@@ -80,21 +83,21 @@ export interface TransformContext {
  * 処理後のテキスト
  */
 export interface ProcessedText {
-  content?: string;  // 中間処理用
-  textContent: string;  // 最終的なテキスト
+  // 処理後のテキスト内容
+  textContent: string;
 }
 
 /**
  * パターン変換の設定
  */
 export interface TransformConfig {
-  // 変換タイプ
+  // 変換タイプ（text: 通常のテキスト変換, tcy: 縦中横用マーカー付与）
   type: 'text' | 'tcy';
 
   // 変換ステップの配列
   steps: TransformStepDefinition[];
 
-  // スペース制御
+  // スペース制御オプション
   ensureSpace?: {
     before?: boolean;
     after?: boolean;
