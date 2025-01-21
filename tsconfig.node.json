@@ -11,10 +11,5 @@
       "@/*": ["./server/*"]
     }
   },
-  "include": [
-    "vite.config.ts",
-    "server/**/*",
-    "tools/**/*",
-    "src/lib/typography/core/transform/*",
-  ]
+  "include": ["vite.config.ts", "server/**/*", "tools/**/*"]
 }

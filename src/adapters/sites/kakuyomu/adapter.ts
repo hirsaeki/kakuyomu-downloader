@@ -34,11 +34,6 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     EPISODE_TITLE: 'WorkTocSection_title'
   } as const;
 
-  // 本文処理用のユーティリティクラス(静的インスタンス。)
-  private static readonly rubyProcessor = new RubyProcessor({
-    nestedRubyBehavior: 'ignore'  // ネストしたルビは無視してデバッグログに出力
-  });
-  private static readonly paragraphProcessor = new ParagraphProcessor();
 
   constructor() {
     const httpClient = new FetchHttpClient(
@@ -437,9 +432,13 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     }
   
     try {
-      // RubyProcessorとParagraphProcessorを使用して本文を処理
-      const rubyProcessed = KakuyomuAdapter.rubyProcessor.process(contentElement.innerHTML);
-      const content = KakuyomuAdapter.paragraphProcessor.process(rubyProcessed);
+      // 本文を青空文庫形式のルビに変換
+      const rubyProcessor = new RubyProcessor();
+      const rubyProcessed = rubyProcessor.toAozoraRuby(contentElement.innerHTML);
+
+      // 改行が含まれるようにして段落処理
+      const paragraphProcessor = new ParagraphProcessor();
+      const content = paragraphProcessor.process(rubyProcessed);
 
       adapterLogger.info('エピソード内容解析完了', {
         title: titleElement.textContent.trim(),

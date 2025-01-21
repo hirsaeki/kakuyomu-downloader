@@ -1,119 +1,74 @@
-import { createContextLogger } from '../logger';
+import { createContextLogger } from '@/lib/logger';
 
 const rubyLogger = createContextLogger('ruby-processor');
 
-interface RubyProcessorOptions {
-  /**
-   * ネストしたrubyタグを検出した際の処理方法
-   * - 'ignore': 無視して処理を続行（デフォルト）
-   * - 'throw': エラーを投げる
-   */
-  nestedRubyBehavior?: 'ignore' | 'throw';
-  
-  /**
-   * プレースホルダーの形式をカスタマイズ
-   * デフォルト: ◆RUBY_{index}▲
-   */
-  placeholderFormat?: (index: number) => string;
-}
-
 /**
- * HTML内のrubyタグを適切に処理するためのユーティリティクラス
+ * XHTMLルビタグと青空文庫形式のルビ記法を相互に変換するプロセッサー
  */
 export class RubyProcessor {
-  private static readonly DEFAULT_OPTIONS: RubyProcessorOptions = {
-    nestedRubyBehavior: 'ignore',
-    placeholderFormat: (index: number) => `◆RUBY_${index}▲`
-  };
-
-  private readonly options: RubyProcessorOptions;
-
-  constructor(options?: RubyProcessorOptions) {
-    this.options = {
-      ...RubyProcessor.DEFAULT_OPTIONS,
-      ...(options || {})
-    };
-  }
-
   /**
-   * HTML文字列内のrubyタグを保持したままtextContent的な処理を行う
-   * @param html 処理対象のHTML文字列
-   * @returns 処理済みのHTML文字列
-   * @throws {Error} nestedRubyBehaviorが'throw'の場合、ネストしたrubyタグを検出すると例外を投げる
+   * XHTMLのルビタグを青空文庫形式のルビ記法に変換する
+   * @param html XHTMLルビタグを含むテキスト
+   * @returns 青空文庫形式のルビ記法に変換されたテキスト
    */
-  process(html: string): string {
-    const rubyTags: Array<{
-      placeholder: string;
-      original: string;
-    }> = [];
+  toAozoraRuby(html: string): string {
+    rubyLogger.debug('XHTMLから青空文庫形式への変換を開始', {
+      textLength: html.length
+    });
 
-    // ネストしたrubyタグのチェック
-    if (this.hasNestedRuby(html)) {
-      rubyLogger.warn('ネストされたルビタグを検出', { html });
-      if (this.options.nestedRubyBehavior === 'throw') {
-        throw new Error('Nested ruby tags are not allowed');
-      }
-    }
-
-    // Step 1: rubyタグを丸ごとプレースホルダーに置換
-    // DEFAULT_OPTIONSが定義済みなので、placeholderFormatは必ず存在することが保証されます
-    const placeholderFormat = (this.options?.placeholderFormat ?? RubyProcessor.DEFAULT_OPTIONS.placeholderFormat) as (index: number) => string;
-    let content = html.replace(
-      /<ruby[^>]*>.*?<\/ruby>/g,
-      (match) => {
-        const placeholder = placeholderFormat(rubyTags.length);
-        rubyTags.push({
-          placeholder,
-          original: match
-        });
-        return placeholder;
-      }
+    const result = html.replace(
+      /<ruby>(.+?)<rt>(.+?)<\/rt>(?:<rp>.+?<\/rp>)?<\/ruby>/g,
+      '｜$1《$2》'
     );
 
-    // Step 2: textContentで処理
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = content;
-    content = tempDiv.textContent || '';
-
-    // Step 3: プレースホルダーをrubyタグに戻す
-    rubyTags.forEach(({placeholder, original}) => {
-      content = content.replace(placeholder, original);
+    rubyLogger.debug('青空文庫形式への変換が完了', {
+      processedLength: result.length,
+      sampleText: result.slice(0, 100)
     });
 
-    rubyLogger.debug('ルビ処理完了', {
-      rubyTagCount: rubyTags.length,
-      resultLength: content.length
-    });
-
-    return content;
+    return result;
   }
 
   /**
-   * ネストしたrubyタグの存在チェック
+   * 青空文庫形式のルビ記法をXHTMLのルビタグに変換する
+   * @param text 青空文庫形式のルビ記法を含むテキスト
+   * @returns XHTMLのルビタグに変換されたテキスト
    */
-  private hasNestedRuby(html: string): boolean {
-    return /<ruby[^>]*>[^<]*<ruby/.test(html);
+  fromAozoraRuby(text: string): string {
+    rubyLogger.debug('青空文庫形式からXHTMLへの変換を開始', {
+      textLength: text.length
+    });
+
+    const result = text.replace(
+      /｜(.+?)《(.+?)》/g,
+      '<ruby>$1<rt>$2</rt><rp>（</rp><rp>）</rp></ruby>'
+    );
+
+    rubyLogger.debug('XHTMLへの変換が完了', {
+      processedLength: result.length,
+      sampleText: result.slice(0, 100)
+    });
+
+    return result;
   }
 
   /**
-   * インスタンスを生成せずに直接処理を行うユーティリティメソッド
+   * クラスメソッドとしてのtoAozoraRuby
+   * @param html XHTMLルビタグを含むテキスト
+   * @returns 青空文庫形式のルビ記法に変換されたテキスト
    */
-  static process(html: string, options?: RubyProcessorOptions): string {
-    const processor = new RubyProcessor(options);
-    return processor.process(html);
+  static toAozoraRuby(html: string): string {
+    const processor = new RubyProcessor();
+    return processor.toAozoraRuby(html);
+  }
+
+  /**
+   * クラスメソッドとしてのfromAozoraRuby
+   * @param text 青空文庫形式のルビ記法を含むテキスト
+   * @returns XHTMLのルビタグに変換されたテキスト
+   */
+  static fromAozoraRuby(text: string): string {
+    const processor = new RubyProcessor();
+    return processor.fromAozoraRuby(text);
   }
 }
-
-// 使用例:
-/*
-// 基本的な使用方法
-const html = '<ruby>漢字<rt>かんじ</rt></ruby>のテスト';
-const processed = RubyProcessor.process(html);
-
-// インスタンスを作成して詳細な設定を行う場合
-const processor = new RubyProcessor({
-  nestedRubyBehavior: 'throw',
-  placeholderFormat: (index) => `[RUBY:${index}]`
-});
-const result = processor.process(html);
-*/
