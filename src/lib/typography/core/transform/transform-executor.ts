@@ -1,30 +1,24 @@
-import type { ITransformStep } from '../transform/types';
+import type { ITransformStep } from './types';
 import type { TransformContext, ProcessedText } from './types';
 import type { GeneratedPattern } from 'virtual:pattern-config';
 import { TransformError } from '@/lib/errors';
 import { StepFactory } from './factory/step-factory';
 import { createContextLogger } from '@/lib/logger';
-import { TypographyDOMOperator } from '../dom/typography-operator';
 
 const transformLogger = createContextLogger('typography-transform');
 
 /**
- * 変換処理の実行を管理するExecutor
+ * テキストベースの変換処理を実行するExecutor
  */
 export class TransformExecutor {
   private steps: ITransformStep[] = [];
-  private readonly operator: TypographyDOMOperator;
-
-  constructor(doc: Document) {
-    this.operator = new TypographyDOMOperator(doc);
-  }
 
   /**
    * パターンからExecutorを生成するファクトリメソッド
    */
-  static fromPattern(pattern: GeneratedPattern, doc: Document): TransformExecutor {
+  static fromPattern(pattern: GeneratedPattern): TransformExecutor {
     transformLogger.info('Creating executor from pattern');
-    const executor = new TransformExecutor(doc);
+    const executor = new TransformExecutor();
     const steps = StepFactory.createFromPattern(pattern);
     transformLogger.debug('Steps created from pattern', { 
       stepCount: steps.length,
@@ -35,7 +29,7 @@ export class TransformExecutor {
   }
 
   /**
-   * 変換ステップを追加（テスト用に残しておく）
+   * 変換ステップを追加
    */
   private addStep(step: ITransformStep): this {
     transformLogger.debug('Adding transform step', { 
@@ -48,7 +42,7 @@ export class TransformExecutor {
   /**
    * 変換処理を実行
    */
-  async execute(context: TransformContext, pattern: GeneratedPattern): Promise<Node> {
+  async execute(context: TransformContext, pattern: GeneratedPattern): Promise<ProcessedText> {
     transformLogger.info('Starting transform execution', {
       initialTextLength: context.text?.length ?? 0,
       stepsCount: this.steps.length,
@@ -59,38 +53,36 @@ export class TransformExecutor {
     // 変換処理の実行
     const { content: processedText } = await this.executeTransformSteps(context);
 
-    // パターン定義の型に基づいて適切なノードを生成
-    let resultNode: Node;
+    // TCYの場合はマーカーで囲む
+    let resultText = processedText;
     if (pattern.transform.type === 'tcy') {
-      transformLogger.debug('Creating TCY element', { 
+      transformLogger.debug('Adding TCY markers', { 
         pattern: pattern.name,
         text: processedText 
       });
-      resultNode = this.operator.createTcyElement(processedText);
-    } else {
-      resultNode = this.operator.createTextNode(processedText);
+      resultText = `†${processedText}‡`;
     }
 
-    // マッチした部分全体のノードの前後の空白を制御
+    // 前後の空白を制御
     const { ensureSpace } = pattern.transform;
     if (ensureSpace) {
-      if (ensureSpace.before) {
-        this.operator.ensureSpaceBefore(resultNode);
+      if (ensureSpace.before && !resultText.startsWith(' ')) {
+        resultText = ` ${resultText}`;
       }
-      if (ensureSpace.after) {
-        this.operator.ensureSpaceAfter(resultNode);
+      if (ensureSpace.after && !resultText.endsWith(' ')) {
+        resultText = `${resultText} `;
       }
     }
 
     transformLogger.info('Transform execution completed', {
-      finalTextLength: processedText.length,
+      finalTextLength: resultText.length,
       nodeType: pattern.transform.type,
       stepsExecuted: this.steps.length,
       ensureSpaceBefore: ensureSpace?.before,
       ensureSpaceAfter: ensureSpace?.after
     });
 
-    return resultNode;
+    return { textContent: resultText };
   }
 
   /**

@@ -2,13 +2,10 @@
  * 変換処理のアクションタイプ
  */
 export type TransformAction =
-  | 'wrap'
   | 'convertWidth'
   | 'replace'
-  | 'processGroup'
   | 'splitBy'
   | 'convertEach'
-  | 'convertGroups'
   | 'join';
 
 /**
@@ -35,7 +32,7 @@ export interface ConversionRule {
 }
 
 /**
- * 変換ステップの設定
+ * 変換ステップのインターフェース
  */
 export interface ITransformStep {
   // 変換ステップが適用可能かどうかを判定
@@ -44,13 +41,12 @@ export interface ITransformStep {
   execute(context: TransformContext): Promise<ProcessedText>;
 }
 
+/**
+ * 変換ステップの設定
+ */
 export interface TransformStepDefinition {
   action: TransformAction;
   // 各アクション用の設定
-  // wrap用設定
-  prefix?: string;
-  suffix?: string;
-
   // convertWidth用設定
   target?: 'numbers' | 'alphabet' | 'symbols';
   direction?: 'fullwidth' | 'halfwidth';
@@ -59,32 +55,17 @@ export interface TransformStepDefinition {
   from?: string;
   to?: string;
 
-  // processGroup用設定
-  group?: number;
-
   // splitBy用設定
   separator?: string | string[];
 
-  // convertEach, convertGroups用設定
+  // convertEach用設定
   rules?: Array<{
-    group?: number;
     type: 'toKanji' | 'toFullwidth';
     params?: Record<string, unknown>;
   }>;
 
   // join用設定
   with?: string;
-  template?: string;
-}
-
-/**
- * パターン設定の型定義
- */
-export interface PatternConfig {
-  pattern: string;  // 正規表現パターン
-  transform: TransformStepDefinition[];  // 変換ステップの配列
-  priority?: number;  // 優先度（オプション）
-  description?: string;  // パターンの説明（オプション）
 }
 
 /**
@@ -93,14 +74,14 @@ export interface PatternConfig {
 export interface TransformContext {
   text: string;
   match?: RegExpMatchArray;
-  reprocess?: (text: string) => Promise<Node[]>;
 }
 
 /**
- * 変換後のテキスト
+ * 処理後のテキスト
  */
 export interface ProcessedText {
-  content: string;
+  content?: string;  // 中間処理用
+  textContent: string;  // 最終的なテキスト
 }
 
 /**
