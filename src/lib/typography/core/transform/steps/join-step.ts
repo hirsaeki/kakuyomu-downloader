@@ -1,64 +1,139 @@
 import { BaseTransformStep } from '../base/transform-step';
 import type { TransformContext, ProcessedText } from '../types';
 import { TransformError } from '@/lib/errors';
+import { createContextLogger } from '@/lib/logger';
 
+const joinLogger = createContextLogger('join-step');
+
+/**
+ * 文字列の結合を行うステップ
+ * テンプレートモードとセパレータモードをサポート
+ */
 export class JoinStep extends BaseTransformStep {
+  // テンプレートのプレースホルダーパターン
+  private static readonly PLACEHOLDER_PATTERN = /\{(\d+)\}/g;
+  // 行分割パターン
+  private static readonly LINE_SPLIT_PATTERN = /\r?\n/;
+
   constructor(
-    private template?: string,
-    private separator: string = ''
+    private readonly template?: string,
+    private readonly separator: string = ''
   ) {
     super();
-  }
+    joinLogger.debug('Initialized join step', {
+      hasTemplate: !!template,
+      separator: separator || '(empty)'
+    });
 
-  override isApplicable(context: TransformContext): boolean {
-    if (!super.isApplicable(context)) return false;
-    try {
-      // JSON配列としてパース可能かチェック
-      const parts = JSON.parse(context.text);
-      return Array.isArray(parts) && parts.every(p => typeof p === 'string');
-    } catch {
-      // テンプレートモードの場合は単一文字列も許容
-      return this.template !== undefined;
+    if (template && template.match(JoinStep.PLACEHOLDER_PATTERN) === null) {
+      const message = 'テンプレートにプレースホルダーが含まれていません';
+      joinLogger.warn(message, { template });
+      // 警告のみ出して処理は継続（無効なテンプレートは単純な文字列として扱う）
     }
   }
 
-  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
+  override isApplicable({ text }: TransformContext): boolean {
+    if (!super.isApplicable({ text })) return false;
+
     try {
-      let parts: string[];
-      try {
-        parts = JSON.parse(context.text);
-        if (!Array.isArray(parts)) {
-          parts = [context.text];
-        }
-      } catch {
-        parts = [context.text];
-      }
+      // テンプレートモードの場合は常に適用可能
+      if (this.template !== undefined) return true;
+
+      // セパレータモードの場合は複数行があるかチェック
+      const lines = text.split(JoinStep.LINE_SPLIT_PATTERN);
+      const hasMultipleLines = lines.length > 1;
+
+      joinLogger.debug('Checking applicability', {
+        textLength: text.length,
+        lineCount: lines.length,
+        hasMultipleLines
+      });
+
+      return hasMultipleLines;
+
+    } catch (error) {
+      joinLogger.error('Error in applicability check', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return false;
+    }
+  }
+
+  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
+    joinLogger.debug('Starting text join', {
+      textLength: text.length,
+      hasTemplate: !!this.template
+    });
+
+    try {
+      // 行分割
+      const parts = text
+        .split(JoinStep.LINE_SPLIT_PATTERN)
+        .map(part => part.trim())
+        .filter(part => part.length > 0);
+
+      joinLogger.debug('Text split into parts', {
+        partsCount: parts.length
+      });
 
       let result: string;
-      
       if (this.template) {
-        result = this.applyTemplate(parts, this.template);
+        result = this.applyTemplate(parts);
       } else {
-        result = parts.join(this.separator);
+        result = this.joinWithSeparator(parts);
       }
+
+      joinLogger.debug('Join completed', {
+        originalLength: text.length,
+        resultLength: result.length,
+        partsCount: parts.length,
+        sampleResult: result.slice(0, 100)
+      });
 
       return this.createResult(result);
 
     } catch (error) {
-      throw new TransformError(
-        `Join operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const message = `結合処理に失敗しました: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      joinLogger.error('Join failed', {
+        error: message,
+        textLength: text.length
+      });
+      throw new TransformError(message);
     }
   }
 
-  private applyTemplate(parts: string[], template: string): string {
-    return template.replace(/\{(\d+)\}/g, (_, index) => {
-      const i = parseInt(index, 10) - 1;
-      return i >= 0 && i < parts.length ? parts[i] : '';
-    });
+  /**
+   * テンプレートを適用して文字列を生成
+   */
+  private applyTemplate(parts: string[]): string {
+    return this.template!.replace(
+      JoinStep.PLACEHOLDER_PATTERN,
+      (_, index) => {
+        const i = parseInt(index, 10) - 1;
+        if (i < 0 || i >= parts.length) {
+          joinLogger.warn('Template index out of bounds', {
+            index: i + 1,
+            partsLength: parts.length
+          });
+          return '';
+        }
+        return parts[i];
+      }
+    );
+  }
+
+  /**
+   * セパレータを使用して文字列を結合
+   */
+  private joinWithSeparator(parts: string[]): string {
+    return parts.join(this.separator);
   }
 
   toString(): string {
-    return `JoinStep(${this.template ? `template: ${this.template}` : `separator: ${this.separator}`})`;
+    return this.template
+      ? `JoinStep(template: "${this.template}")`
+      : `JoinStep(separator: "${this.separator}")`;
   }
 }
