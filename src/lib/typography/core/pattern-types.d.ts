@@ -19,7 +19,7 @@ declare module 'virtual:pattern-config' {
     transform: {
       type: 'text' | 'tcy';
       steps: Array<{
-        action: 'wrap' | 'convertWidth' | 'replace' | 'processGroup' | 'splitBy' | 'convertEach' | 'convertGroups' | 'join';
+        action: 'wrap' | 'convertWidth' | 'replace' | 'splitBy' | 'convertEach' | 'join';
         prefix?: string;
         suffix?: string;
         target?: WidthTarget;

@@ -11,16 +11,11 @@ patterns:
         - action: convertWidth
           target: numbers
           direction: halfwidth
-        - action: convertGroups
+        - action: convertEach
           rules:
-            - group: 1
-              type: toKanji
-            - group: 2
-              type: toKanji
-            - group: 3
-              type: toKanji
+            - type: toKanji
         - action: join
-          template: "{1}年{2}月{3}日"
+          with: ""
 
   - name: fractionFormat
     description: 分数を漢数字に変換
@@ -32,12 +27,11 @@ patterns:
         - action: convertWidth
           target: numbers
           direction: halfwidth
-        - action: convertGroups
+        - action: splitBy
+          separator: ["/", "／"]
+        - action: convertEach
           rules:
-            - group: 1
-              type: toKanji
-            - group: 2
-              type: toKanji
+            - type: toKanji
         - action: join
           template: "{2}分の{1}"
 
@@ -53,14 +47,13 @@ patterns:
         - action: convertWidth
           target: numbers
           direction: halfwidth
-        - action: convertGroups
+        - action: splitBy
+          separator: [".", "・", "．"]
+        - action: convertEach
           rules:
-            - group: 1
-              type: toKanji
-            - group: 2
-              type: toKanji
+            - type: toKanji
         - action: join
-          template: "{1}・{2}"
+          with: "・"
 
   - name: eraFormat
     description: 元号年を漢数字に変換
@@ -72,9 +65,8 @@ patterns:
         - action: convertWidth
           target: numbers
           direction: halfwidth
-        - action: convertGroups
+        - action: convertEach
           rules:
-            - group: 2
-              type: toKanji
+            - type: toKanji
         - action: join
           template: "{1}{2}年"
