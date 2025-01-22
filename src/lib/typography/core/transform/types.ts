@@ -78,6 +78,10 @@ export interface TransformContext {
   text: string;
   // 正規表現マッチ結果（オプショナル）
   match?: RegExpMatchArray;
+  // オリジナルのテキスト（オプショナル）
+  originalText?: string;
+  // ステップ固有のパラメータ（オプショナル）
+  params?: Record<string, unknown>;
 }
 
 /**
@@ -86,22 +90,14 @@ export interface TransformContext {
 export interface ProcessedText {
   // 処理後のテキスト内容
   textContent: string;
-}
-
-/**
- * パターン変換の設定
- */
-export interface TransformConfig {
-  // 変換タイプ（text: 通常のテキスト変換, tcy: 縦中横用マーカー付与）
-  type: 'text' | 'tcy';
-
-  // 変換ステップの配列
-  steps: TransformStepDefinition[];
-
-  // スペース制御オプション
-  ensureSpace?: {
-    before?: boolean;
-    after?: boolean;
+  // 処理結果のメタデータ（オプショナル）
+  metadata?: {
+    // 元のテキストからの変更があったかどうか
+    modified: boolean;
+    // 適用されたルール名
+    appliedRules?: string[];
+    // 変換処理で発生した警告
+    warnings?: string[];
   };
 }
 
@@ -125,4 +121,21 @@ export interface PatternDefinition {
 
   // 優先度（任意）。未指定の場合は基本優先度を使用
   priority?: number;
+}
+
+/**
+ * パターン変換の設定
+ */
+export interface TransformConfig {
+  // 変換タイプ（text: 通常のテキスト変換, tcy: 縦中横用マーカー付与）
+  type: 'text' | 'tcy';
+
+  // 変換ステップの配列
+  steps: TransformStepDefinition[];
+
+  // スペース制御オプション
+  ensureSpace?: {
+    before?: boolean;
+    after?: boolean;
+  };
 }

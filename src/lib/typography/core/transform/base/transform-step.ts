@@ -21,19 +21,45 @@ export abstract class BaseTransformStep implements ITransformStep {
    * @returns 変換可能な場合はtrue
    */
   isApplicable(context: TransformContext): boolean {
+    // コンテキストの存在チェック
     if (!context) {
-      stepLogger.error(`${this.name}: Invalid context provided`);
+      stepLogger.error(`${this.name}: No context provided`);
       throw new TransformError('変換コンテキストが指定されていません');
     }
 
-    // テキストの存在と型のチェック
+    // textの存在チェック
+    if (!('text' in context)) {
+      stepLogger.error(`${this.name}: Missing required 'text' property in context`);
+      throw new TransformError('コンテキストにtextプロパティがありません');
+    }
+
+    // textの型チェック
     if (typeof context.text !== 'string') {
-      stepLogger.debug(`${this.name}: Invalid text property type`);
+      stepLogger.error(`${this.name}: Invalid text property type`, {
+        type: typeof context.text
+      });
+      throw new TransformError('テキストが文字列ではありません');
+    }
+
+    // 空文字列のチェック
+    if (context.text.length === 0) {
+      stepLogger.debug(`${this.name}: Empty text provided`);
       return false;
     }
 
-    stepLogger.debug(`${this.name}: Checking applicability`, {
-      textLength: context.text.length
+    // matchプロパティのチェック（存在する場合）
+    if ('match' in context && context.match) {
+      if (!Array.isArray(context.match)) {
+        stepLogger.error(`${this.name}: Invalid match property type`, {
+          type: typeof context.match
+        });
+        throw new TransformError('matchプロパティが配列ではありません');
+      }
+    }
+
+    stepLogger.debug(`${this.name}: Context validation passed`, {
+      textLength: context.text.length,
+      hasMatch: 'match' in context
     });
 
     return true;
@@ -46,7 +72,9 @@ export abstract class BaseTransformStep implements ITransformStep {
    */
   async execute(context: TransformContext): Promise<ProcessedText> {
     stepLogger.debug(`${this.name}: Starting execution`, {
-      textLength: context.text?.length ?? 0
+      textLength: context.text?.length ?? 0,
+      hasMatch: !!context.match,
+      hasParams: !!context.params
     });
 
     try {
@@ -93,6 +121,11 @@ export abstract class BaseTransformStep implements ITransformStep {
       textLength: text.length
     });
 
-    return { textContent: text };
+    return {
+      textContent: text,
+      metadata: {
+        modified: true
+      }
+    };
   }
 }
