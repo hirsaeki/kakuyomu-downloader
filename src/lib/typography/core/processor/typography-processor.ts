@@ -111,7 +111,7 @@ export class TypographyProcessor {
             flags: pattern.pattern.flags
           }
         });
-        result = await this.processWithPattern(result, pattern, depth);
+        result = await this.processWithPattern(result, pattern);
       }
 
       typographyLogger.info('Processing completed', {
@@ -145,8 +145,7 @@ export class TypographyProcessor {
 
   private async processWithPattern(
     text: string,
-    pattern: GeneratedPattern,
-    currentDepth: number
+    pattern: GeneratedPattern
   ): Promise<string> {
     const regexp = this.getOrCreateRegExp(pattern);
     const matches = [...text.replaceAll('\n', '\u000A').matchAll(regexp)];
