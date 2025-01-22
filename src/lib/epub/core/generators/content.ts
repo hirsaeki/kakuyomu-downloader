@@ -7,6 +7,7 @@ import { InputChapter } from '../types';
 import EPUB_CONFIG from '@/config/epub';
 import { createContextLogger } from '@/lib/logger';
 import { patterns } from 'virtual:pattern-config';
+import { TcyConverter, RubyConverter, LineBreakProcessor } from '@/lib/html';
 
 interface ContentGeneratorOptions {
   useGroupTitles?: boolean;
@@ -28,6 +29,9 @@ export interface GeneratedChapter {
 export class ContentGenerator {
   private readonly typographyProcessor: TypographyProcessor;
   private readonly documentBuilder: XHTMLDocumentBuilder;
+  private readonly rubyConverter: RubyConverter;
+  private readonly tcyConverter: TcyConverter;
+  private readonly lineBreakProcessor: LineBreakProcessor;
 
   constructor() {
     contentLogger.debug('ContentGeneratorを初期化');
@@ -35,6 +39,9 @@ export class ContentGenerator {
       Object.values(patterns)
     );
     this.documentBuilder = new XHTMLDocumentBuilder(EPUB_CONFIG);
+    this.rubyConverter = new RubyConverter();
+    this.tcyConverter = new TcyConverter();
+    this.lineBreakProcessor = new LineBreakProcessor();
   }
 
   /**
@@ -153,15 +160,26 @@ export class ContentGenerator {
       });
 
       // Process typography
-      const processedContent = await this.typographyProcessor.process(contentWithTitle);
+      const typographyProcessed = await this.typographyProcessor.process(contentWithTitle);
 
       contentLogger.debug('Typography処理完了', {
-        type: typeof processedContent,
-        length: processedContent.length
+        type: typeof typographyProcessed,
+        length: typographyProcessed.length,
+        firstChars: typographyProcessed.substring(0, 100)
       });
-      
+
+      // 後処理
+      const rubyConverted = this.rubyConverter.fromAozoraRuby(typographyProcessed);
+      const tcyConverted = this.tcyConverter.process(rubyConverted);
+      const lineBreakProcessed = this.lineBreakProcessor.process(tcyConverted);
+
+      contentLogger.debug('後処理完了', {
+        textLength: lineBreakProcessed.length,
+        firstChars: lineBreakProcessed.substring(0, 100)
+      });
+
       // Create and validate document
-      const doc = this.documentBuilder.createDocument(chapter.title, processedContent);
+      const doc = this.documentBuilder.createDocument(chapter.title, lineBreakProcessed);
       
       // Additional debug information
       const contentDiv = doc.querySelector('.content');

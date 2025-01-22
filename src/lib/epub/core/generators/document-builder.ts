@@ -3,12 +3,6 @@ import { createContextLogger } from '@/lib/logger';
 
 const documentLogger = createContextLogger('epub-document-builder');
 
-interface ElementInfo {
-  tagName: string;
-  attributes: string[];
-  textContent?: string;
-}
-
 /**
  * XHTML document builder with improved content handling
  */
@@ -18,10 +12,10 @@ export class XHTMLDocumentBuilder {
   /**
    * Creates an XHTML document with the given title and content
    * @param title The chapter title
-   * @param content Content as either DocumentFragment or string
+   * @param content Content as string
    * @returns Document object
    */
-  createDocument(title: string, content: DocumentFragment | string): Document {
+  createDocument(title: string, content: string): Document {
     documentLogger.debug('XHTML文書の生成開始', { title });
 
     const { XML_VERSION, XML_ENCODING, NAMESPACE } = this.config.METADATA;
@@ -46,54 +40,25 @@ export class XHTMLDocumentBuilder {
     }
 
     try {
-      const getAllElementInfo = (node: Node): ElementInfo[] => {
-        const result: ElementInfo[] = [];
-        if (node instanceof Element) {
-          result.push({
-            tagName: node.tagName,
-            attributes: Array.from(node.attributes).map(a => `${a.name}="${a.value}"`),
-            textContent: node.textContent?.substring(0, 20)
-          });
-        }
-        if (node.hasChildNodes()) {
-          Array.from(node.childNodes).forEach(child => {
-            result.push(...getAllElementInfo(child));
-          });
-        }
-        return result;
-      };
-
-      if (typeof content === 'string') {
-        contentDiv.innerHTML = content;
-      } else {
-        documentLogger.debug('DocumentFragmentをインポート前の状態', {
-          fragmentInfo: {
-            hasChildNodes: content.hasChildNodes(),
-            childNodes: content.childNodes.length,
-            allElements: getAllElementInfo(content)
-          }
-        });
-        
-        const imported = doc.importNode(content, true);
-        
-        documentLogger.debug('DocumentFragmentをインポート後の状態', {
-          importedInfo: {
-            hasChildNodes: imported.hasChildNodes(),
-            childNodes: imported.childNodes.length,
-            allElements: getAllElementInfo(imported)
-          }
-        });
-        
-        contentDiv.appendChild(imported);
-      }
+      contentDiv.innerHTML = content;
 
       // Validate imported content
       if (!contentDiv.hasChildNodes()) {
         documentLogger.error('インポートされたコンテンツが空です');
         throw new Error('Imported content is empty');
       }
+
+      documentLogger.debug('コンテンツインポート完了', {
+        hasContent: contentDiv.hasChildNodes(),
+        contentLength: contentDiv.textContent?.length,
+        sampleContent: contentDiv.textContent?.substring(0, 100)
+      });
     } catch (error) {
-      documentLogger.error('コンテンツのインポートに失敗:', error);
+      documentLogger.error('コンテンツのインポートに失敗', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        contentLength: content.length,
+        sampleContent: content.substring(0, 100)
+      });
       throw error;
     }
 
