@@ -4,11 +4,9 @@ import {
 } from '../types';
 import { TransformError } from '@/lib/errors';
 import { 
-  ConvertGroupsStep,
   ConvertKanjiStep, 
   ConvertWidthStep,
   JoinStep,
-  ProcessGroupStep,
   ReplaceStep,
   SplitByStep,
   WrapStep
@@ -73,12 +71,6 @@ export class StepFactory {
           }
           return new ReplaceStep(config.from, config.to);
 
-        case 'processGroup':
-          if (config.group === undefined) {
-            throw new TransformError('Missing group number for processGroup');
-          }
-          return new ProcessGroupStep(config.group);
-
         case 'splitBy':
           if (!config.separator) {
             throw new TransformError('Missing separator for splitBy');
@@ -94,29 +86,15 @@ export class StepFactory {
             new ConvertKanjiStep() :
             null;
 
-        case 'convertGroups':
-          if (!config.rules || config.rules.length === 0) {
-            throw new TransformError('Missing rules for convertGroups');
-          }
-          if (!config.rules.every(rule => typeof rule.group === 'number')) {
-            throw new TransformError('Each rule must have a group number for convertGroups');
-          }
-          return new ConvertGroupsStep(
-            config.rules.map(rule => ({ 
-              group: config.group as number,
-              rule 
-            }))
-          );
-
         case 'join':
           return new JoinStep(config.template, config.with);
 
         default:
-          console.warn(`Unknown action type: ${config.action}`);
+          factoryLogger.warn(`Unknown action type: ${config.action}`);
           return null;
       }
     } catch (error) {
-      console.error(`Step creation failed:`, error);
+      factoryLogger.error(`Step creation failed:`, error instanceof Error ? error.message : 'Unknown error');
       return null;
     }
   }

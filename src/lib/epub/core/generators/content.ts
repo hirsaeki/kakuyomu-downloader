@@ -2,7 +2,6 @@ import JSZip from 'jszip';
 import { ValidationError } from '@/lib/errors/validation';
 import { GenerationError } from '@/lib/errors/generation';
 import { TypographyProcessor } from '@/lib/typography/core/processor';
-import { TypographyDOMOperator } from '@/lib/typography/core/dom';
 import { XHTMLDocumentBuilder } from './document-builder';
 import { InputChapter } from '../types';
 import EPUB_CONFIG from '@/config/epub';
@@ -33,8 +32,7 @@ export class ContentGenerator {
   constructor() {
     contentLogger.debug('ContentGeneratorを初期化');
     this.typographyProcessor = TypographyProcessor.getInstance(
-      Object.values(patterns),
-      new TypographyDOMOperator(document)
+      Object.values(patterns)
     );
     this.documentBuilder = new XHTMLDocumentBuilder(EPUB_CONFIG);
   }
@@ -158,9 +156,8 @@ export class ContentGenerator {
       const processedContent = await this.typographyProcessor.process(contentWithTitle);
 
       contentLogger.debug('Typography処理完了', {
-        type: processedContent instanceof DocumentFragment ? 'DocumentFragment' : typeof processedContent,
-        hasChildNodes: processedContent instanceof DocumentFragment && processedContent.hasChildNodes(),
-        childCount: processedContent instanceof DocumentFragment ? processedContent.childNodes.length : 'N/A'
+        type: typeof processedContent,
+        length: processedContent.length
       });
       
       // Create and validate document

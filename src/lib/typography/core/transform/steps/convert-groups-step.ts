@@ -87,12 +87,12 @@ override isApplicable(context: TransformContext): boolean {
       switch (rule.type) {
         case 'toKanji': {
           const kanjiResult = await this.kanjiConverter.execute({ text: content });
-          return kanjiResult.content;
+          return kanjiResult.textContent;
         }
 
         case 'toFullwidth': {
           const widthResult = await this.widthConverter.execute({ text: content });
-          return widthResult.content;
+          return widthResult.textContent;
         }
 
         default:

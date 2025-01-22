@@ -51,7 +51,7 @@ export class TransformExecutor {
     });
 
     // 変換処理の実行
-    const { content: processedText } = await this.executeTransformSteps(context);
+    const { textContent: processedText } = await this.executeTransformSteps(context);
 
     // TCYの場合はマーカーで囲む
     let resultText = processedText;
@@ -96,7 +96,7 @@ export class TransformExecutor {
 
     if (this.steps.length === 0) {
       transformLogger.warn('No transform steps registered');
-      return { content: context.text };
+      return { textContent: context.text };
     }
 
     let currentText = context.text;
@@ -117,7 +117,7 @@ export class TransformExecutor {
         if (applicable) {
           transformLogger.debug(`Executing step: ${step.constructor.name}`);
           const result = await step.execute(stepContext);
-          currentText = result.content;
+          currentText = result.textContent;
           transformLogger.debug(`Step completed: ${step.constructor.name}`, {
             newTextLength: currentText.length
           });
@@ -143,7 +143,7 @@ export class TransformExecutor {
       }
     }
 
-    return { content: currentText };
+    return { textContent: currentText };
   }
 
   private async checkStepApplicability(

@@ -63,6 +63,7 @@ export interface TransformStepDefinition {
 
   // join用設定
   with?: string;
+  template?: string;
 
   // wrap用設定
   prefix?: string;
@@ -102,4 +103,26 @@ export interface TransformConfig {
     before?: boolean;
     after?: boolean;
   };
+}
+
+/**
+ * パターン設定の定義
+ */
+export interface PatternDefinition {
+  // パターン名
+  name: string;
+
+  // 正規表現パターン設定
+  pattern: {
+    source: string;
+    flags?: string;
+    lookbehind?: string;
+    lookahead?: string;
+  };
+
+  // 変換設定
+  transform: TransformConfig;
+
+  // 優先度（任意）。未指定の場合は基本優先度を使用
+  priority?: number;
 }

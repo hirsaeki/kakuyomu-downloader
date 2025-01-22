@@ -39,6 +39,24 @@ export default [
       ...tseslint.configs.recommended.rules,
       ...reactPlugin.configs.recommended.rules,
       ...pluginReactHooks.configs.recommended.rules,
+      'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug'] }],
+    },
+  },
+  {
+    files: ['**/tools/vite/**/*.ts', '**/tools/vite/**/*.mts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: ['./tsconfig.json', 'tsconfig.*.json'],
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      ...eslintConfigPrettier.rules,
+      ...tseslint.configs.recommended.rules,
+      'no-console': 'off',
     },
   },
   {

@@ -165,12 +165,12 @@ export class ConvertWidthStep extends BaseTransformStep {
   }
 
   private convertCharWidth(text: string): string {
-    const ranges = {
+    const ranges: Record<Exclude<WidthTarget, 'symbols'>, [string, string]> = {
       numbers: ["0-9", "０-９"],
       alphabet: ["A-Za-z", "Ａ-Ｚａ-ｚ"],
     };
 
-    const [halfRange, fullRange] = ranges[this.target];
+    const [halfRange, fullRange] = ranges[this.target as Exclude<WidthTarget, 'symbols'>];
     const pattern = this.getOrCreateRegExp(
       `[${this.direction === "fullwidth" ? halfRange : fullRange}]`
     );

@@ -33,7 +33,7 @@ interface PatternDefinition {
     transform: {
       type: 'text' | 'tcy';
       steps: Array<{
-        action: string;
+        action: 'convertWidth' | 'replace' | 'splitBy' | 'convertEach' | 'join' | 'wrap';
         prefix?: string;
         suffix?: string;
         target?: string;

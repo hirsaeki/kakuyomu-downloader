@@ -217,8 +217,8 @@ export class TypographyProcessor {
     });
 
     return [...patterns].sort((a, b) => {
-      const priorityA = a.priority ?? a.basePriority ?? 0;
-      const priorityB = b.priority ?? b.basePriority ?? 0;
+      const priorityA = a.priority ?? 0;
+      const priorityB = b.priority ?? 0;
       return priorityA - priorityB;  // 昇順（小さい数が優先）
     });
   }

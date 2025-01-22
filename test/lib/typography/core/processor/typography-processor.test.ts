@@ -22,9 +22,9 @@ describe('TypographyProcessor', () => {
         transform: {
           type: 'text' as const,
           steps: [{
-            action: 'convertWidth',
-            target: 'numbers',
-            direction: 'fullwidth',
+            action: 'convertWidth' as const,
+            target: 'numbers' as const,
+            direction: 'fullwidth' as const,
           }],
         },
         priority: 1,
@@ -66,7 +66,7 @@ describe('TypographyProcessor', () => {
         transform: {
           type: 'text' as const,
           steps: [{
-            action: 'replace',
+            action: 'replace' as const,
             with: 'TEST_LOW',
           }],
         },
@@ -81,7 +81,7 @@ describe('TypographyProcessor', () => {
         transform: {
           type: 'text' as const,
           steps: [{
-            action: 'replace',
+            action: 'replace' as const,
             with: 'TEST_HIGH',
           }],
         },
@@ -114,9 +114,9 @@ describe('TypographyProcessor', () => {
         transform: {
           type: 'tcy' as const,
           steps: [{
-            action: 'convertWidth',
-            target: 'numbers',
-            direction: 'halfwidth',
+            action: 'convertWidth' as const,
+            target: 'numbers' as const,
+            direction: 'halfwidth' as const,
           }],
         },
         priority: 1,
