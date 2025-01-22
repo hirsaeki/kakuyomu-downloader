@@ -38,15 +38,15 @@ export class SplitByStep extends BaseTransformStep {
     }
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
 
     try {
       // 区切り文字の存在確認
-      const hasAnyMatch = this.separators.some(sep => text.includes(sep));
+      const hasAnyMatch = this.separators.some(sep => context.text.includes(sep));
 
       splitLogger.debug('Checking applicability', {
-        textLength: text.length,
+        textLength: context.text.length,
         hasAnyMatch,
         separatorsCount: this.separators.length
       });
@@ -61,15 +61,15 @@ export class SplitByStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     splitLogger.debug('Starting text split', {
-      textLength: text.length,
+      textLength: context.text.length,
       separatorsCount: this.separators.length
     });
 
     try {
       // 空白を除去せずに分割を行う
-      let parts = [text];
+      let parts = [context.text];
 
       // 各区切り文字で順番に分割
       this.separators.forEach(sep => {
@@ -81,7 +81,7 @@ export class SplitByStep extends BaseTransformStep {
       const result = parts.join(this.joinWith);
 
       splitLogger.debug('Split completed', {
-        originalLength: text.length,
+        originalLength: context.text.length,
         resultLength: result.length,
         partsCount: parts.length,
         sampleResult: result.slice(0, 100)
@@ -95,7 +95,7 @@ export class SplitByStep extends BaseTransformStep {
       }`;
       splitLogger.error('Split failed', {
         error: message,
-        textLength: text.length
+        textLength: context.text.length
       });
       throw new TransformError(message);
     }
