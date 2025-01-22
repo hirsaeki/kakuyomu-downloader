@@ -1,66 +1,71 @@
-import tseslint from '@typescript-eslint/eslint-plugin';
-import eslintConfigPrettier from 'eslint-config-prettier';
+import eslint from "@eslint/js";
+import tseslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
-import eslint from '@eslint/js';
-import globals from 'globals';
-import reactPlugin from 'eslint-plugin-react';
+import eslintConfigPrettier from "eslint-config-prettier";
+import reactPlugin from "eslint-plugin-react";
+import globals from "globals";
 // @ts-expect-error - eslint-plugin-react-hooks does not have types
-import pluginReactHooks from 'eslint-plugin-react-hooks';
+import pluginReactHooks from "eslint-plugin-react-hooks";
 
 export default [
   {
     ignores: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/coverage/**',
-      '.next/**',
-      '.vscode/**',
-      '.idea/**',
-      '**/*.min.js',
-      'src/components/ui/**',
-      '**/generated/**',
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      ".next/**",
+      ".vscode/**",
+      ".idea/**",
+      "**/*.min.js",
+      "src/components/ui/**",
+      "**/generated/**",
     ],
   },
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ["**/*.ts", "**/*.tsx"],
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: ['./tsconfig.json', 'tsconfig.*.json'],
+        project: ["./tsconfig.json", "tsconfig.*.json"],
       },
     },
     plugins: {
-      '@typescript-eslint': tseslint,
+      "@typescript-eslint": tseslint,
       react: reactPlugin,
-      'react-hooks':pluginReactHooks, 
+      "react-hooks": pluginReactHooks,
     },
     rules: {
       ...eslintConfigPrettier.rules,
       ...tseslint.configs.recommended.rules,
       ...reactPlugin.configs.recommended.rules,
       ...pluginReactHooks.configs.recommended.rules,
-      'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug'] }],
+      "no-console": ["error", { allow: ["warn", "error", "info", "debug"] }],
     },
   },
   {
-    files: ['**/tools/vite/**/*.ts', '**/tools/vite/**/*.mts'],
+    files: ["**/tools/vite/**/*.ts", "**/tools/vite/**/*.mts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: ['./tsconfig.json', 'tsconfig.*.json'],
+        project: ["./tsconfig.json", "tsconfig.*.json"],
       },
     },
     plugins: {
-      '@typescript-eslint': tseslint,
+      "@typescript-eslint": tseslint,
     },
     rules: {
       ...eslintConfigPrettier.rules,
       ...tseslint.configs.recommended.rules,
-      'no-console': 'off',
+      "no-console": "off",
     },
   },
   {
-    files: ['**/*.js', '**/*.jsx'],
+    files: ["**/*.js", "**/*.jsx"],
     languageOptions: {
       globals: globals.browser,
     },

@@ -18,15 +18,16 @@ export class ConvertKanjiStep extends BaseTransformStep {
     kanjiLogger.debug('Initialized kanji converter');
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
 
     try {
-      const trimmed = text.trim();
+      const trimmed = context.text.trim();
       const isValidNumber = ConvertKanjiStep.NUMBER_PATTERN.test(trimmed);
 
       kanjiLogger.debug('Checking applicability', {
-        textLength: text.length,
+        text: context.text,
+        textLength: context.text.length,
         trimmedLength: trimmed.length,
         isValidNumber
       });
@@ -49,14 +50,14 @@ export class ConvertKanjiStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     kanjiLogger.debug('Starting kanji conversion', {
-      textLength: text.length,
-      text: text
+      textLength: context.text.length,
+      text: context.text
     });
 
     try {
-      const trimmed = text.trim();
+      const trimmed = context.text.trim();
       
       // 数値の妥当性チェック
       if (!/^\d+$/.test(trimmed)) {
@@ -67,9 +68,9 @@ export class ConvertKanjiStep extends BaseTransformStep {
       const converted = this.convertToKanji(trimmed);
 
       kanjiLogger.debug('Conversion completed', {
-        originalLength: text.length,
+        originalLength: context.text.length,
         resultLength: converted.length,
-        original: text,
+        original: context.text,
         converted
       });
 
@@ -81,7 +82,7 @@ export class ConvertKanjiStep extends BaseTransformStep {
       }`;
       kanjiLogger.error('Conversion failed', {
         error: message,
-        text
+        text: context.text
       });
       throw new TransformError(message);
     }

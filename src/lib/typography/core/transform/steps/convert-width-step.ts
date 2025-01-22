@@ -70,18 +70,18 @@ export class ConvertWidthStep extends BaseTransformStep {
     });
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
 
     try {
       // 対象の文字種が含まれているかチェック
-      const hasTargetChars = this.hasTargetCharacters(text);
+      const hasTargetChars = this.hasTargetCharacters(context.text);
 
       widthLogger.debug("Checking applicability", {
         target: this.target,
         direction: this.direction,
         hasTargetChars,
-        textLength: text.length,
+        textLength: context.text.length,
       });
 
       return hasTargetChars;
@@ -94,14 +94,12 @@ export class ConvertWidthStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({
-    text,
-  }: TransformContext): Promise<ProcessedText> {
-    if (!this.isApplicable({ text })) {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
+    if (!this.isApplicable(context)) {
       widthLogger.error("Invalid text content for width conversion", {
         target: this.target,
         direction: this.direction,
-        textLength: text.length,
+        textLength: context.text.length,
       });
       throw new TransformError("文字幅変換処理に失敗しました");
     }
@@ -110,11 +108,11 @@ export class ConvertWidthStep extends BaseTransformStep {
       widthLogger.debug("Starting width conversion", {
         target: this.target,
         direction: this.direction,
-        textLength: text.length,
-        sampleText: text.slice(0, 100),
+        textLength: context.text.length,
+        sampleText: context.text.slice(0, 100),
       });
 
-      const converted = this.convertWidth(text);
+      const converted = this.convertWidth(context.text);
 
       widthLogger.debug("Width conversion completed", {
         textLength: converted.length,

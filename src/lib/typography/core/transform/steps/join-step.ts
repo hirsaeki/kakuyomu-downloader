@@ -40,11 +40,11 @@ export class JoinStep extends BaseTransformStep {
       if (this.template !== undefined) return true;
 
       // セパレータモードの場合は複数行があるかチェック
-      const lines = text.split(JoinStep.LINE_SPLIT_PATTERN);
+      const lines = context.text.split(JoinStep.LINE_SPLIT_PATTERN);
       const hasMultipleLines = lines.length > 1;
 
       joinLogger.debug('Checking applicability', {
-        textLength: text.length,
+        textLength: context.text.length,
         lineCount: lines.length,
         hasMultipleLines
       });

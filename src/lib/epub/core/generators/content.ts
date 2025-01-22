@@ -7,7 +7,7 @@ import { InputChapter } from '../types';
 import EPUB_CONFIG from '@/config/epub';
 import { createContextLogger } from '@/lib/logger';
 import { patterns } from 'virtual:pattern-config';
-import { TcyConverter, RubyConverter, LineBreakProcessor } from '@/lib/html';
+import { TcyConverter, RubyProcessor, LineBreakProcessor } from '@/lib/html';
 
 interface ContentGeneratorOptions {
   useGroupTitles?: boolean;
@@ -29,7 +29,7 @@ export interface GeneratedChapter {
 export class ContentGenerator {
   private readonly typographyProcessor: TypographyProcessor;
   private readonly documentBuilder: XHTMLDocumentBuilder;
-  private readonly rubyConverter: RubyConverter;
+  private readonly rubyProcessor: RubyProcessor;
   private readonly tcyConverter: TcyConverter;
   private readonly lineBreakProcessor: LineBreakProcessor;
 
@@ -39,7 +39,7 @@ export class ContentGenerator {
       Object.values(patterns)
     );
     this.documentBuilder = new XHTMLDocumentBuilder(EPUB_CONFIG);
-    this.rubyConverter = new RubyConverter();
+    this.rubyProcessor = new RubyProcessor();
     this.tcyConverter = new TcyConverter();
     this.lineBreakProcessor = new LineBreakProcessor();
   }
@@ -169,7 +169,7 @@ export class ContentGenerator {
       });
 
       // 後処理
-      const rubyConverted = this.rubyConverter.fromAozoraRuby(typographyProcessed);
+      const rubyConverted = this.rubyProcessor.fromAozoraRuby(typographyProcessed);
       const tcyConverted = this.tcyConverter.process(rubyConverted);
       const lineBreakProcessed = this.lineBreakProcessor.process(tcyConverted);
 
