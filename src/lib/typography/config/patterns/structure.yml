@@ -1,5 +1,6 @@
+---
 description: 基本的な文章構造に関するパターン（引用符、段落など）
-basePriority: 100
+basePriority: 500
 patterns:
   - name: lineWithHeadingQuotes
     description: |
@@ -9,22 +10,22 @@ patterns:
       例: ^　'こんにちは。' → 『こんにちは』
       例: ^　'こんにちは' → 『こんにちは』
     pattern:
-      source: ^[\\t 　]*([""''])(.*?)。?\\1
-      flags: "gm"
+      source: ^[\\t 　]*([\"”\'’]).*\\1$
+      flags: gm
     transform:
       type: text
       steps:
         - action: replace
-          from: (?<!。)。?[""]$
+          from: (?<!。)。?[\"”]$
           to: "」"
         - action: replace
-          from: (?<!。)。['']$
+          from: (?<!。)。[\'’]$
           to: 』
         - action: replace
-          from: ^[\\t 　]*[""]
+          from: ^[\\t 　]*[\"”]
           to: "「"
         - action: replace
-          from: ^[\\t 　]*['']
+          from: ^[\\t 　]*[\'’]
           to: "『"
 
   - name: periodsBeforeClosingBrackets
@@ -41,31 +42,31 @@ patterns:
           from: "。([」』])"
           to: "$1"
 
+  - name: lineStartIndent
+    description: |
+      行頭字下げ
+      例: ^こんにちは → 　こんにちは
+    pattern:
+      source: ^[\\t 　]*
+      flags: gm
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: ^[\\t 　]*
+          to: "　"
+
   - name: lineStartBrackets
     description: |
       行頭のカギカッコ類は字下げしない
       例: ^　「こんにちは」 → 「こんにちは」
       例: ^　『こんにちは』 → 『こんにちは』
     pattern:
-      source: "^[\\t 　]*([「『])"
-      flags: "gm"
+      source: ^[\\t 　]*[「『]"
+      flags: gm
     transform:
       type: text
       steps:
         - action: replace
-          from: "^[\\t 　]*"
+          from: ^[\\t 　]*
           to: ""
-
-  - name: lineStartIndent
-    description: |
-      行頭字下げ
-      例: ^こんにちは → 　こんにちは
-    pattern:
-      source: "^[\\t 　]*"
-      flags: "gm"
-    transform:
-      type: text
-      steps:
-        - action: replace
-          from: "^[\\t 　]*"
-          to: "　"

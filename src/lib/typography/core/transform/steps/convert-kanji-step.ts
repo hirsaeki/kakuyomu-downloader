@@ -1,21 +1,37 @@
-import { BaseTransformStep } from '../base/transform-step';
-import type { TransformContext, ProcessedText } from '../types';
-import { TransformError } from '@/lib/errors';
-import { createContextLogger } from '@/lib/logger';
+import { TransformError } from "@/lib/errors";
+import { createContextLogger } from "@/lib/logger";
+import { BaseTransformStep } from "../base/transform-step";
+import type { ProcessedText, TransformContext } from "../types";
+import { ConvertWidthStep } from "./convert-width-step";
 
-const kanjiLogger = createContextLogger('convert-kanji-step');
+const kanjiLogger = createContextLogger("convert-kanji-step");
 
 /**
  * 数値を漢数字に変換するステップ
  */
 export class ConvertKanjiStep extends BaseTransformStep {
-  private static readonly KANJI_NUMS = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'] as const;
-  private static readonly NUMBER_PATTERN = /^\d+$/;
-  private static readonly MAX_SAFE_LENGTH = 16;  // 安全に処理可能な最大桁数
+  private static readonly KANJI_NUMS = [
+    "〇",
+    "一",
+    "二",
+    "三",
+    "四",
+    "五",
+    "六",
+    "七",
+    "八",
+    "九",
+  ] as const;
+  private static readonly NUMBER_PATTERN = /^[0-9０-９]+$/; // 全角、半角に対応
+  private static readonly MAX_SAFE_LENGTH = 16; // 安全に処理可能な最大桁数
+  private readonly widthConverter = new ConvertWidthStep(
+    "halfWidth",
+    "numbers"
+  );
 
   constructor() {
     super();
-    kanjiLogger.debug('Initialized kanji converter');
+    kanjiLogger.debug("Initialized kanji converter");
   }
 
   override isApplicable(context: TransformContext): boolean {
@@ -25,64 +41,70 @@ export class ConvertKanjiStep extends BaseTransformStep {
       const trimmed = context.text.trim();
       const isValidNumber = ConvertKanjiStep.NUMBER_PATTERN.test(trimmed);
 
-      kanjiLogger.debug('Checking applicability', {
+      kanjiLogger.debug("Checking applicability", {
         text: context.text,
         textLength: context.text.length,
         trimmedLength: trimmed.length,
-        isValidNumber
+        isValidNumber,
       });
 
       if (trimmed.length > ConvertKanjiStep.MAX_SAFE_LENGTH) {
-        kanjiLogger.warn('Text exceeds safe length', {
+        kanjiLogger.warn("Text exceeds safe length", {
           length: trimmed.length,
-          maxSafe: ConvertKanjiStep.MAX_SAFE_LENGTH
+          maxSafe: ConvertKanjiStep.MAX_SAFE_LENGTH,
         });
         return false;
       }
 
       return isValidNumber;
-
     } catch (error) {
-      kanjiLogger.error('Error in applicability check', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+      kanjiLogger.error("Error in applicability check", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return false;
     }
   }
 
-  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
-    kanjiLogger.debug('Starting kanji conversion', {
+  protected async processTransform(
+    context: TransformContext
+  ): Promise<ProcessedText> {
+    kanjiLogger.debug("Starting kanji conversion", {
       textLength: context.text.length,
-      text: context.text
+      text: context.text,
     });
 
     try {
       const trimmed = context.text.trim();
-      
+
+      // まず全角数字を半角数字に変換
+      const halfWidthResult = await this.widthConverter.execute({
+        text: trimmed,
+      });
+      const halfWidthText = halfWidthResult.textContent;
+
       // 数値の妥当性チェック
-      if (!/^\d+$/.test(trimmed)) {
-        throw new Error('Invalid number format');
+      if (!/^\d+$/.test(halfWidthText)) {
+        throw new Error("Invalid number format after halfWidth conversion");
       }
 
       // 漢数字への変換
-      const converted = this.convertToKanji(trimmed);
+      const converted = this.convertToKanji(halfWidthText);
 
-      kanjiLogger.debug('Conversion completed', {
+      kanjiLogger.debug("Conversion completed", {
         originalLength: context.text.length,
         resultLength: converted.length,
         original: context.text,
-        converted
+        converted,
       });
 
       return this.createResult(converted);
-
     } catch (error) {
       const message = `漢数字変換に失敗しました: ${
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : "Unknown error"
       }`;
-      kanjiLogger.error('Conversion failed', {
+      kanjiLogger.error("Conversion failed", {
         error: message,
-        text: context.text
+        text: context.text,
       });
       throw new TransformError(message);
     }
@@ -93,18 +115,18 @@ export class ConvertKanjiStep extends BaseTransformStep {
    */
   private convertToKanji(numberStr: string): string {
     return numberStr
-      .split('')
-      .map(digit => {
+      .split("")
+      .map((digit) => {
         const num = parseInt(digit, 10);
         if (isNaN(num) || num < 0 || num > 9) {
           throw new Error(`Invalid digit: ${digit}`);
         }
         return ConvertKanjiStep.KANJI_NUMS[num];
       })
-      .join('');
+      .join("");
   }
 
   toString(): string {
-    return 'ConvertKanjiStep()';
+    return "ConvertKanjiStep()";
   }
 }

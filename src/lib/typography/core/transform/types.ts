@@ -1,28 +1,22 @@
 /**
  * 変換処理のアクションタイプ
  */
-export type TransformAction =
-  | 'convertWidth'
-  | 'replace'
-  | 'splitBy'
-  | 'convertEach'
-  | 'join'
-  | 'wrap';
+export type TransformAction = "convertWidth" | "convertKanji" | "replace";
 
 /**
  * 文字幅変換の対象
  */
-export type WidthTarget = 'numbers' | 'alphabet' | 'symbols';
+export type WidthTarget = "numbers" | "alphabet" | "symbols";
 
 /**
  * 文字幅変換の方向
  */
-export type WidthDirection = 'fullwidth' | 'halfwidth';
+export type WidthDirection = "fullWidth" | "halfWidth";
 
 /**
  * 変換ルールの種類
  */
-export type ConversionRuleType = 'toKanji' | 'toFullwidth';
+export type ConversionRuleType = "toKanji" | "toFullwidth";
 
 /**
  * 変換ルールの定義
@@ -54,20 +48,6 @@ export interface TransformStepDefinition {
   // replace用設定
   from?: string;
   to?: string;
-
-  // splitBy用設定
-  separator?: string | string[];
-
-  // convertEach用設定
-  rules?: ConversionRule[];
-
-  // join用設定
-  with?: string;
-  template?: string;
-
-  // wrap用設定
-  prefix?: string;
-  suffix?: string;
 }
 
 /**
@@ -128,7 +108,7 @@ export interface PatternDefinition {
  */
 export interface TransformConfig {
   // 変換タイプ（text: 通常のテキスト変換, tcy: 縦中横用マーカー付与）
-  type: 'text' | 'tcy';
+  type: "text" | "tcy";
 
   // 変換ステップの配列
   steps: TransformStepDefinition[];

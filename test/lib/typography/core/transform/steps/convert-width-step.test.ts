@@ -11,15 +11,15 @@ describe("ConvertWidthStep", () => {
 
   describe("isApplicable", () => {
     it.each<[WidthTarget, WidthDirection, string, boolean]>([
-      ["numbers", "fullwidth", "123", true],
-      ["numbers", "halfwidth", "１２３", true],
-      ["alphabet", "fullwidth", "abc", true],
-      ["alphabet", "halfwidth", "ａｂｃ", true],
-      ["symbols", "fullwidth", "!@#", true],
-      ["symbols", "halfwidth", "！＠＃", true],
-      ["numbers", "fullwidth", "abc", false],
-      ["alphabet", "fullwidth", "123", false],
-      ["symbols", "fullwidth", "abc123", false],
+      ["numbers", "fullWidth", "123", true],
+      ["numbers", "halfWidth", "１２３", true],
+      ["alphabet", "fullWidth", "abc", true],
+      ["alphabet", "halfWidth", "ａｂｃ", true],
+      ["symbols", "fullWidth", "!@#", true],
+      ["symbols", "halfWidth", "！＠＃", true],
+      ["numbers", "fullWidth", "abc", false],
+      ["alphabet", "fullWidth", "123", false],
+      ["symbols", "fullWidth", "abc123", false],
     ])(
       "should correctly determine applicability for %s to %s conversion",
       (target, direction, text, expected) => {
@@ -29,7 +29,7 @@ describe("ConvertWidthStep", () => {
     );
 
     it("should handle invalid input gracefully", () => {
-      const step = new ConvertWidthStep("fullwidth", "numbers");
+      const step = new ConvertWidthStep("fullWidth", "numbers");
       // @ts-expect-error: Testing invalid input
       expect(step.isApplicable(null)).toBe(false);
       // @ts-expect-error: Testing invalid input
@@ -41,12 +41,12 @@ describe("ConvertWidthStep", () => {
 
   describe("execute", () => {
     it.each<[WidthTarget, WidthDirection, string, string]>([
-      ["numbers", "fullwidth", "123", "１２３"],
-      ["numbers", "halfwidth", "１２３", "123"],
-      ["alphabet", "fullwidth", "ABC", "ＡＢＣ"],
-      ["alphabet", "halfwidth", "ＡＢＣ", "ABC"],
-      ["symbols", "fullwidth", "!@#", "！＠＃"],
-      ["symbols", "halfwidth", "！＠＃", "!@#"],
+      ["numbers", "fullWidth", "123", "１２３"],
+      ["numbers", "halfWidth", "１２３", "123"],
+      ["alphabet", "fullWidth", "ABC", "ＡＢＣ"],
+      ["alphabet", "halfWidth", "ＡＢＣ", "ABC"],
+      ["symbols", "fullWidth", "!@#", "！＠＃"],
+      ["symbols", "halfWidth", "！＠＃", "!@#"],
     ])(
       "should convert %s to %s correctly",
       async (target, direction, input, expected) => {
@@ -57,19 +57,19 @@ describe("ConvertWidthStep", () => {
     );
 
     it("should handle mixed content correctly", async () => {
-      const step = new ConvertWidthStep("fullwidth", "numbers");
+      const step = new ConvertWidthStep("fullWidth", "numbers");
       const result = await step.execute(createContext("abc123def"));
       expect(result.textContent).toBe("abc１２３def");
     });
 
-    it("should preserve untargeted characters", async () => {
-      const step = new ConvertWidthStep("fullwidth", "alphabet");
+    it("should preserve un-targeted characters", async () => {
+      const step = new ConvertWidthStep("fullWidth", "alphabet");
       const result = await step.execute(createContext("123abc!@#"));
-      expect(result.textContent).toBe("123ＡＢＣ!@#");
+      expect(result.textContent).toBe("123ａｂｃ!@#");
     });
 
     it("should throw TransformError for invalid input", async () => {
-      const step = new ConvertWidthStep("fullwidth", "numbers");
+      const step = new ConvertWidthStep("fullWidth", "numbers");
       await expect(step.execute(createContext("abc"))).rejects.toThrow(
         TransformError
       );
@@ -78,20 +78,20 @@ describe("ConvertWidthStep", () => {
 
   describe("edge cases", () => {
     it("should handle empty string", async () => {
-      const step = new ConvertWidthStep("fullwidth", "numbers");
+      const step = new ConvertWidthStep("fullWidth", "numbers");
       await expect(step.execute(createContext(""))).rejects.toThrow(
         TransformError
       );
     });
 
     it("should handle whitespace", async () => {
-      const step = new ConvertWidthStep("fullwidth", "symbols");
+      const step = new ConvertWidthStep("fullWidth", "symbols");
       const result = await step.execute(createContext(" "));
       expect(result.textContent).toBe("　");
     });
 
     it("should handle long text efficiently", async () => {
-      const step = new ConvertWidthStep("fullwidth", "numbers");
+      const step = new ConvertWidthStep("fullWidth", "numbers");
       const input = "123".repeat(1000);
       const expected = "１２３".repeat(1000);
       const result = await step.execute(createContext(input));
@@ -99,11 +99,11 @@ describe("ConvertWidthStep", () => {
     });
 
     it("should handle all ASCII symbols", async () => {
-      const step = new ConvertWidthStep("fullwidth", "symbols");
+      const step = new ConvertWidthStep("fullWidth", "symbols");
       const input = "!@#$%^&*()_+-=[]\\{}|;':\",./<>?`~";
       const result = await step.execute(createContext(input));
       expect(result.textContent).toBe(
-        '！＠＃＄％＾＆＊（）＿＋－＝［］＼｛｝｜；’："，．／＜＞？｀～'
+        "！＠＃＄％＾＆＊（）＿＋－＝［］＼｛｝｜；’：”，．／＜＞？｀～"
       );
     });
   });

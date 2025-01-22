@@ -94,7 +94,9 @@ export class ConvertWidthStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
+  protected async processTransform(
+    context: TransformContext
+  ): Promise<ProcessedText> {
     if (!this.isApplicable(context)) {
       widthLogger.error("Invalid text content for width conversion", {
         target: this.target,
@@ -138,7 +140,7 @@ export class ConvertWidthStep extends BaseTransformStep {
         return /[a-zA-Zａ-ｚＡ-Ｚ]/.test(text);
       case "symbols": {
         const symbols =
-          this.direction === "fullwidth"
+          this.direction === "fullWidth"
             ? Object.keys(ConvertWidthStep.SYMBOL_MAP)
             : Object.keys(ConvertWidthStep.REVERSE_SYMBOL_MAP);
         return symbols.some((s) => text.includes(s));
@@ -154,7 +156,7 @@ export class ConvertWidthStep extends BaseTransformStep {
       case "alphabet":
         return this.convertCharWidth(text);
       case "symbols":
-        return this.direction === "fullwidth"
+        return this.direction === "fullWidth"
           ? this.toFullWidth(text)
           : this.toHalfWidth(text);
       default:
@@ -163,16 +165,17 @@ export class ConvertWidthStep extends BaseTransformStep {
   }
 
   private convertCharWidth(text: string): string {
-    const ranges: Record<Exclude<WidthTarget, 'symbols'>, [string, string]> = {
+    const ranges: Record<Exclude<WidthTarget, "symbols">, [string, string]> = {
       numbers: ["0-9", "０-９"],
       alphabet: ["A-Za-z", "Ａ-Ｚａ-ｚ"],
     };
 
-    const [halfRange, fullRange] = ranges[this.target as Exclude<WidthTarget, 'symbols'>];
+    const [halfRange, fullRange] =
+      ranges[this.target as Exclude<WidthTarget, "symbols">];
     const pattern = this.getOrCreateRegExp(
-      `[${this.direction === "fullwidth" ? halfRange : fullRange}]`
+      `[${this.direction === "fullWidth" ? halfRange : fullRange}]`
     );
-    const offset = this.direction === "fullwidth" ? 0xfee0 : -0xfee0;
+    const offset = this.direction === "fullWidth" ? 0xfee0 : -0xfee0;
 
     widthLogger.debug("Converting character width", {
       target: this.target,

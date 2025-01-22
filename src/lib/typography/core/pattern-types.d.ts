@@ -1,7 +1,7 @@
-declare module 'virtual:pattern-config' {
-  type WidthTarget = 'numbers' | 'alphabet' | 'symbols';
-  type WidthDirection = 'fullwidth' | 'halfwidth';
-  type ConversionRuleType = 'toKanji' | 'toFullwidth';
+declare module "virtual:pattern-config" {
+  type WidthTarget = "numbers" | "alphabet" | "symbols";
+  type WidthDirection = "fullWidth" | "halfWidth";
+  type ConversionRuleType = "toKanji" | "toFullwidth";
 
   interface ConversionRule {
     type: ConversionRuleType;
@@ -17,20 +17,13 @@ declare module 'virtual:pattern-config' {
       lookahead?: string;
     };
     transform: {
-      type: 'text' | 'tcy';
+      type: "text" | "tcy";
       steps: Array<{
-        action: 'wrap' | 'convertWidth' | 'replace' | 'splitBy' | 'convertEach' | 'join';
-        prefix?: string;
-        suffix?: string;
+        action: "convertWidth" | "convertKanji" | "replace";
         target?: WidthTarget;
         direction?: WidthDirection;
         from?: string;
         to?: string;
-        group?: number;
-        rules?: Array<ConversionRule>;
-        separator?: string | string[];
-        with?: string;
-        template?: string;
       }>;
       ensureSpace?: {
         before?: boolean;

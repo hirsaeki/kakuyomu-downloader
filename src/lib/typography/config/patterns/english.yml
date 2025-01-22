@@ -1,34 +1,35 @@
+---
 description: 英単語関連のパターン
-basePriority: 400
+basePriority: 200
 patterns:
   - name: longEnglishWord
-    description: 4文字以上の英単語(頭alphabetのalphanumeric)は半角に
+    description: 4文字以上の英単語(先頭alphabetのalphanumeric)は半角に
     pattern:
-      source: "([a-zA-Zａ-ｚＡ-Ｚ][0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{3,})"
-      lookbehind: "(?<![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])"
-      lookahead: "(?![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])"
+      source: "[a-zA-Zａ-ｚＡ-Ｚ][0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{3,}"
+      lookbehind: (?<![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])
+      lookahead: (?![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])
     transform:
       type: text
       steps:
         - action: convertWidth
           target: alphabet
-          direction: halfwidth
+          direction: halfWidth
         - action: convertWidth
           target: numbers
-          direction: halfwidth
+          direction: halfWidth
 
   - name: shortEnglishWord
-    description: 1-3文字の英単語(頭alphabetのalphanumeric)は全角に変換
+    description: 1-3文字の英単語(先頭alphabetのalphanumeric)は全角に変換
     pattern:
-      source: "([a-zA-Zａ-ｚＡ-Ｚ][0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{0,2})"
-      lookbehind: "(?<![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])"
-      lookahead: "(?![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])"
+      source: "[a-zA-Zａ-ｚＡ-Ｚ][0-9a-zA-Z０-９ａ-ｚＡ-Ｚ]{0,2}"
+      lookbehind: (?<![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])
+      lookahead: (?![0-9a-zA-Z０-９ａ-ｚＡ-Ｚ])
     transform:
       type: text
       steps:
         - action: convertWidth
           target: alphabet
-          direction: fullwidth
+          direction: fullWidth
         - action: convertWidth
           target: numbers
-          direction: fullwidth
+          direction: fullWidth
