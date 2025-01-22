@@ -53,16 +53,16 @@ export class WrapStep extends BaseTransformStep {
     }
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
 
     try {
       // 結果の長さチェック
-      const resultLength = this.prefix.length + text.length + this.suffix.length;
+      const resultLength = this.prefix.length + context.text.length + this.suffix.length;
       const isLengthValid = resultLength <= 1000000;  // 1MB以下を妥当とする
 
       wrapLogger.debug('Checking applicability', {
-        textLength: text.length,
+        textLength: context.text.length,
         resultLength,
         isLengthValid
       });
@@ -81,18 +81,18 @@ export class WrapStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     wrapLogger.debug('Starting text wrap', {
-      textLength: text.length,
+      textLength: context.text.length,
       hasPrefix: !!this.prefix,
       hasSuffix: !!this.suffix
     });
 
     try {
-      const wrapped = `${this.prefix}${text}${this.suffix}`;
+      const wrapped = `${this.prefix}${context.text}${this.suffix}`;
 
       wrapLogger.debug('Wrap completed', {
-        originalLength: text.length,
+        originalLength: context.text.length,
         wrappedLength: wrapped.length,
         sampleResult: wrapped.slice(0, 100)
       });
@@ -105,7 +105,7 @@ export class WrapStep extends BaseTransformStep {
       }`;
       wrapLogger.error('Wrap failed', {
         error: message,
-        textLength: text.length
+        textLength: context.text.length
       });
       throw new TransformError(message);
     }
