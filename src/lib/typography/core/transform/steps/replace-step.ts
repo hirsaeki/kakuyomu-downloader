@@ -41,18 +41,18 @@ export class ReplaceStep extends BaseTransformStep {
     }
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
 
     try {
       // パターンマッチの確認
       this.pattern.lastIndex = 0;  // resetが必要
-      const hasMatch = this.pattern.test(text);
+      const hasMatch = this.pattern.test(context.text);
 
       replaceLogger.debug('Checking applicability', {
         from: this.from,
         hasMatch,
-        textLength: text.length
+        textLength: context.text.length
       });
 
       return hasMatch;
@@ -65,9 +65,9 @@ export class ReplaceStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     replaceLogger.debug('Starting text replacement', {
-      textLength: text.length,
+      textLength: context.text.length,
       from: this.from,
       to: this.to
     });
@@ -75,16 +75,16 @@ export class ReplaceStep extends BaseTransformStep {
     try {
       // 置換前のパターンマッチ回数を取得（ロギング用）
       this.pattern.lastIndex = 0;
-      const matches = text.match(this.pattern);
+      const matches = context.text.match(this.pattern);
       const matchCount = matches?.length ?? 0;
 
       // 実際の置換処理
       this.pattern.lastIndex = 0;  // resetが必要
-      const result = text.replace(this.pattern, this.to);
+      const result = context.text.replace(this.pattern, this.to);
 
       replaceLogger.debug('Replacement completed', {
         matchCount,
-        originalLength: text.length,
+        originalLength: context.text.length,
         resultLength: result.length,
         sampleResult: result.slice(0, 100)
       });
@@ -99,7 +99,7 @@ export class ReplaceStep extends BaseTransformStep {
         error: message,
         from: this.from,
         to: this.to,
-        textLength: text.length
+        textLength: context.text.length
       });
       throw new TransformError(message);
     }
