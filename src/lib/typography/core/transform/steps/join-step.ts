@@ -32,8 +32,8 @@ export class JoinStep extends BaseTransformStep {
     }
   }
 
-  override isApplicable({ text }: TransformContext): boolean {
-    if (!super.isApplicable({ text })) return false;
+  override isApplicable(context: TransformContext): boolean {
+    if (!super.isApplicable(context)) return false;
 
     try {
       // テンプレートモードの場合は常に適用可能
@@ -59,15 +59,15 @@ export class JoinStep extends BaseTransformStep {
     }
   }
 
-  protected async processTransform({ text }: TransformContext): Promise<ProcessedText> {
+  protected async processTransform(context: TransformContext): Promise<ProcessedText> {
     joinLogger.debug('Starting text join', {
-      textLength: text.length,
+      textLength: context.text.length,
       hasTemplate: !!this.template
     });
 
     try {
       // 行分割
-      const parts = text
+      const parts = context.text
         .split(JoinStep.LINE_SPLIT_PATTERN)
         .map(part => part.trim())
         .filter(part => part.length > 0);
@@ -84,7 +84,7 @@ export class JoinStep extends BaseTransformStep {
       }
 
       joinLogger.debug('Join completed', {
-        originalLength: text.length,
+        originalLength: context.text.length,
         resultLength: result.length,
         partsCount: parts.length,
         sampleResult: result.slice(0, 100)
@@ -98,7 +98,7 @@ export class JoinStep extends BaseTransformStep {
       }`;
       joinLogger.error('Join failed', {
         error: message,
-        textLength: text.length
+        textLength: context.text.length
       });
       throw new TransformError(message);
     }
