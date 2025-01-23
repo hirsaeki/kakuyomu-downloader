@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --build --noEmit",
     "typecheck:watch": "tsc --build --noEmit --watch",
-    "test": "vitest run",
+    "test": "vitest run --reporter verbose",
     "test:watch": "vitest watch",
     "lint": "eslint --flag unstable_ts_config",
     "lint:fix": "eslint --flag unstable_ts_config --fix",

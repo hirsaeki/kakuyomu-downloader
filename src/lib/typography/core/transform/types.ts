@@ -41,13 +41,19 @@ export interface TransformStepDefinition {
  * 変換処理のコンテキスト
  */
 export interface TransformContext {
-  // 変換対象のテキスト
+  // 変換対象のテキスト（現在のステップで処理する対象）
   text: string;
-  // 正規表現マッチ結果（オプショナル）
+
+  // パターンマッチで取得した元のマッチ情報（読み取り専用）
+  // 全てのステップを通して保持される
+  readonly originalMatch?: RegExpMatchArray;
+
+  // 現在のステップ内で生成されたマッチ情報（オプショナル）
+  // 各ステップでリセットされる
   match?: RegExpMatchArray;
-  // オリジナルのテキスト（オプショナル）
-  originalText?: string;
+
   // ステップ固有のパラメータ（オプショナル）
+  // 主にステップの動作を制御するために使用
   params?: Record<string, unknown>;
 }
 

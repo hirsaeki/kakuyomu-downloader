@@ -105,65 +105,57 @@ export class TransformExecutor {
     }
 
     let currentText = context.text;
+    const originalMatch = context.match;  // 元のマッチ情報を保持
+
+    transformLogger.debug('Starting transform steps', {
+      stepsCount: this.steps.length,
+      initialText: currentText.substring(0, 100)
+    });
 
     for (const step of this.steps) {
       try {
+        // ステップ実行用の新しいコンテキストを作成
+        // 元のマッチ情報は読み取り専用で渡し、ステップ独自のマッチ情報はクリア
         const stepContext = {
-          ...context,
           text: currentText,
+          originalMatch,  // 元のマッチ情報
+          match: undefined,  // ステップ独自のマッチはクリア
+          params: context.params  // その他のパラメータは維持
         };
 
-        transformLogger.debug(`Checking step: ${step.constructor.name}`, {
+        transformLogger.debug(`Executing step: ${step.constructor.name}`, {
           currentTextLength: currentText.length,
+          textSample: currentText.substring(0, 50)
         });
 
-        const applicable = await this.checkStepApplicability(step, stepContext);
+        // ステップを実行し、結果を次のステップの入力として使用
+        const result = await step.execute(stepContext);
+        currentText = result.textContent;
 
-        if (applicable) {
-          transformLogger.debug(`Executing step: ${step.constructor.name}`);
-          const result = await step.execute(stepContext);
-          currentText = result.textContent;
-          transformLogger.debug(`Step completed: ${step.constructor.name}`, {
-            newTextLength: currentText.length,
-          });
-        } else {
-          transformLogger.debug(`Step skipped: ${step.constructor.name}`, {
-            reason: "Content not applicable for this transform step",
-            contentLength: currentText.length,
-          });
-        }
+        transformLogger.debug(`Step completed: ${step.constructor.name}`, {
+          newTextLength: currentText.length,
+          textSample: currentText.substring(0, 50)
+        });
+
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-
+        // エラー時はログを記録するが、処理は継続
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         transformLogger.error(`Step failed: ${step.constructor.name}`, {
           error: errorMessage,
-          content: currentText.substring(0, 100),
+          content: currentText.substring(0, 100)
         });
-
-        throw new TransformError(
-          `Transform step failed (${step.constructor.name}): ${errorMessage}`
-        );
+        // エラーが発生したステップはスキップして次へ
+        continue;
       }
     }
+
+    transformLogger.debug('Transform steps completed', {
+      finalTextLength: currentText.length,
+      finalText: currentText.substring(0, 100)
+    });
 
     return { textContent: currentText };
   }
 
-  private async checkStepApplicability(
-    step: ITransformStep,
-    context: TransformContext
-  ): Promise<boolean> {
-    try {
-      return step.isApplicable(context);
-    } catch (error) {
-      transformLogger.warn(
-        `Applicability check failed: ${step.constructor.name}`,
-        {
-          error: error instanceof Error ? error.message : "Unknown error",
-        }
-      );
-      return false; // エラーの場合は安全のためfalse
-    }
-  }
+  // 適用可否判定は削除 - 全ステップを必ず適用する設計に変更
 }
