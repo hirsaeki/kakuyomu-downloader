@@ -59,6 +59,41 @@ describe("TypographyProcessor", () => {
     });
   });
 
+  describe("Single step processing", () => {
+    const patterns = {
+      "replace-test": {
+        name: "replace-test",
+        pattern: {
+          source: "test",
+        },
+        transform: {
+          type: "text" as const,
+          steps: [
+            {
+              action: "replace" as const,
+              from: "test",
+              to: "TEST_REPLACED",
+            },
+          ],
+        },
+        priority: 1,
+      },
+    };
+
+    let processor: TypographyProcessor;
+
+    beforeEach(() => {
+      processor = TypographyProcessor.getInstance(Object.values(patterns));
+    });
+
+    it("should apply a single replace step correctly", async () => {
+      const input = "<p>This is a test.</p>";
+      const expected = "<p>This is a TEST_REPLACED.</p>";
+      const result = await processor.process(input);
+      expect(result).toBe(expected);
+    });
+  });
+
   describe("Priority handling", () => {
     const patterns = {
       "low-priority": {

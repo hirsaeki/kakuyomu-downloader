@@ -165,7 +165,12 @@ export class TypographyProcessor {
 
       try {
         const executor = this.executors.get(pattern.name);
-        if (!executor) continue;
+        if (!executor) {
+          typographyLogger.warn("Executor not found for pattern", {
+            pattern: pattern.name,
+          });
+          continue;
+        }
 
         const transformed = await executor.execute(
           {
