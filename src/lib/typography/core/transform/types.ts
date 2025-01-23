@@ -14,19 +14,6 @@ export type WidthTarget = "numbers" | "alphabet" | "symbols";
 export type WidthDirection = "fullWidth" | "halfWidth";
 
 /**
- * 変換ルールの種類
- */
-export type ConversionRuleType = "toKanji" | "toFullwidth";
-
-/**
- * 変換ルールの定義
- */
-export interface ConversionRule {
-  type: ConversionRuleType;
-  params?: Record<string, unknown>;
-}
-
-/**
  * 変換ステップのインターフェース
  */
 export interface ITransformStep {
@@ -92,8 +79,6 @@ export interface PatternDefinition {
   pattern: {
     source: string;
     flags?: string;
-    lookbehind?: string;
-    lookahead?: string;
   };
 
   // 変換設定

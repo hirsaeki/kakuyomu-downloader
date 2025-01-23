@@ -1,7 +1,6 @@
 declare module "virtual:pattern-config" {
   type WidthTarget = "numbers" | "alphabet" | "symbols";
   type WidthDirection = "fullWidth" | "halfWidth";
-  type ConversionRuleType = "toKanji" | "toFullwidth";
 
   interface ConversionRule {
     type: ConversionRuleType;
@@ -13,8 +12,6 @@ declare module "virtual:pattern-config" {
     pattern: {
       source: string;
       flags?: string;
-      lookbehind?: string;
-      lookahead?: string;
     };
     transform: {
       type: "text" | "tcy";

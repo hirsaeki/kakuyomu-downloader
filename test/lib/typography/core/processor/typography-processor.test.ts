@@ -13,8 +13,8 @@ vi.mock("@/lib/logger", () => ({
 describe("TypographyProcessor", () => {
   describe("Basic text processing", () => {
     const patterns = {
-      "test-fullwidth": {
-        name: "test-fullwidth",
+      "test-fullWidth": {
+        name: "test-fullWidth",
         pattern: {
           source: "([0-9])",
           flags: "g",
@@ -72,7 +72,8 @@ describe("TypographyProcessor", () => {
           steps: [
             {
               action: "replace" as const,
-              with: "TEST_LOW",
+              from: ".*",
+              to: "TEST_LOW",
             },
           ],
         },
@@ -89,7 +90,8 @@ describe("TypographyProcessor", () => {
           steps: [
             {
               action: "replace" as const,
-              with: "TEST_HIGH",
+              from: ".*",
+              to: "TEST_HIGH",
             },
           ],
         },
@@ -141,7 +143,7 @@ describe("TypographyProcessor", () => {
 
     it("should wrap two-digit numbers with TCY markers", async () => {
       const input = "<p>これは42です</p>";
-      const expected = "<p>これは†42‡です</p>";
+      const expected = "<p>これは〘42〙です</p>";
       const result = await processor.process(input);
       expect(result).toBe(expected);
     });

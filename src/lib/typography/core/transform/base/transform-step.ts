@@ -23,22 +23,22 @@ export abstract class BaseTransformStep implements ITransformStep {
   isApplicable(context: TransformContext): boolean {
     // コンテキストの存在チェック
     if (!context) {
-      stepLogger.error(`${this.name}: No context provided`);
-      throw new TransformError('変換コンテキストが指定されていません');
+      stepLogger.warn(`${this.name}: No context provided`);
+      return false;
     }
 
     // textの存在チェック
     if (!('text' in context)) {
-      stepLogger.error(`${this.name}: Missing required 'text' property in context`);
-      throw new TransformError('コンテキストにtextプロパティがありません');
+      stepLogger.warn(`${this.name}: Missing required 'text' property in context`);
+      return false;
     }
 
     // textの型チェック
     if (typeof context.text !== 'string') {
-      stepLogger.error(`${this.name}: Invalid text property type`, {
+      stepLogger.warn(`${this.name}: Invalid text property type`, {
         type: typeof context.text
       });
-      throw new TransformError('テキストが文字列ではありません');
+      return false;
     }
 
     // 空文字列のチェック
@@ -50,10 +50,10 @@ export abstract class BaseTransformStep implements ITransformStep {
     // matchプロパティのチェック（存在する場合）
     if ('match' in context && context.match) {
       if (!Array.isArray(context.match)) {
-        stepLogger.error(`${this.name}: Invalid match property type`, {
+        stepLogger.warn(`${this.name}: Invalid match property type`, {
           type: typeof context.match
         });
-        throw new TransformError('matchプロパティが配列ではありません');
+        return false;
       }
     }
 

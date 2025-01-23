@@ -1,27 +1,25 @@
-import { TransformExecutor } from '../transform/transform-executor';
-import type { GeneratedPattern } from 'virtual:pattern-config';
-import { ProcessorError, ValidationError } from '@/lib/errors';
-import { createContextLogger } from '@/lib/logger';
-import DOMPurify from 'dompurify';
+import { ProcessorError, ValidationError } from "@/lib/errors";
+import { createContextLogger } from "@/lib/logger";
+import DOMPurify from "dompurify";
+import type { GeneratedPattern } from "virtual:pattern-config";
+import { TransformExecutor } from "../transform/transform-executor";
 
-const typographyLogger = createContextLogger('typography-processor');
+const typographyLogger = createContextLogger("typography-processor");
 
 export class TypographyProcessor {
   private static instance: TypographyProcessor | null = null;
   private readonly patterns: GeneratedPattern[];
   private readonly executors: Map<string, TransformExecutor>;
-  private readonly compiledPatterns: Map<string, RegExp>;  // 正規表現キャッシュ
+  private readonly compiledPatterns: Map<string, RegExp>; // 正規表現キャッシュ
   private readonly MAX_RECURSION_DEPTH = 10;
 
-  private constructor(
-    patterns: GeneratedPattern[],
-  ) {
+  private constructor(patterns: GeneratedPattern[]) {
     this.patterns = this.sortPatterns(patterns);
     this.executors = new Map(
-      this.patterns.map(pattern => [
+      this.patterns.map((pattern) => [
         pattern.name,
         // テキスト処理のためのExecutorを生成
-        TransformExecutor.fromPattern(pattern)
+        TransformExecutor.fromPattern(pattern),
       ])
     );
 
@@ -32,40 +30,38 @@ export class TypographyProcessor {
       this.compiledPatterns.set(pattern.name, regexp);
     }
 
-    typographyLogger.debug('Initialized processor', {
+    typographyLogger.debug("Initialized processor", {
       patternCount: patterns.length,
-      compiledPatterns: this.compiledPatterns.size
+      compiledPatterns: this.compiledPatterns.size,
     });
   }
 
   protected buildFullPattern(pattern: GeneratedPattern): RegExp {
-    const { source, lookbehind, lookahead, flags = 'g'} = pattern.pattern;
-    const fullPattern = `${lookbehind || ''}${source}${lookahead || ''}`;
+    const { source, flags = "g" } = pattern.pattern;
+    const fullPattern = `${source}`;
 
-    typographyLogger.debug('Building pattern', {
+    typographyLogger.debug("Building pattern", {
       pattern: pattern.name,
       source,
       flags,
-      fullPattern
+      fullPattern,
     });
 
     return new RegExp(fullPattern, flags);
   }
 
-  static getInstance(
-    patterns?: GeneratedPattern[],
-  ): TypographyProcessor {
-    typographyLogger.debug('Instance requested', {
+  static getInstance(patterns?: GeneratedPattern[]): TypographyProcessor {
+    typographyLogger.debug("Instance requested", {
       hasPatterns: !!patterns,
     });
 
     if (!this.instance) {
       if (!patterns) {
-        typographyLogger.error('Initialization failed', {
+        typographyLogger.error("Initialization failed", {
           patterns: !!patterns,
         });
         throw new ProcessorError(
-          'TypographyProcessor initialization failed: Required dependencies missing'
+          "TypographyProcessor initialization failed: Required dependencies missing"
         );
       }
 
@@ -77,25 +73,25 @@ export class TypographyProcessor {
 
   public async process(html: string, depth: number = 0): Promise<string> {
     if (depth >= this.MAX_RECURSION_DEPTH) {
-      typographyLogger.error('Maximum recursion depth exceeded', {
+      typographyLogger.error("Maximum recursion depth exceeded", {
         depth,
         maxDepth: this.MAX_RECURSION_DEPTH,
         contentLength: html.length,
-        sampleContent: html.slice(0, 100)
+        sampleContent: html.slice(0, 100),
       });
       throw new ProcessorError(
         `Typography processing exceeded maximum recursion depth (${this.MAX_RECURSION_DEPTH}). ` +
-        'This might indicate a pattern definition issue.'
+          "This might indicate a pattern definition issue."
       );
     }
 
     if (!html) {
-      throw new ValidationError('HTML content is empty');
+      throw new ValidationError("HTML content is empty");
     }
 
-    typographyLogger.info('Starting content processing', { 
+    typographyLogger.info("Starting content processing", {
       contentLength: html.length,
-      recursionDepth: depth
+      recursionDepth: depth,
     });
 
     try {
@@ -108,25 +104,27 @@ export class TypographyProcessor {
           priority: pattern.priority,
           pattern: {
             source: pattern.pattern.source,
-            flags: pattern.pattern.flags
-          }
+            flags: pattern.pattern.flags,
+          },
         });
         result = await this.processWithPattern(result, pattern);
       }
 
-      typographyLogger.info('Processing completed', {
-        patternCount: this.patterns.length
+      typographyLogger.info("Processing completed", {
+        patternCount: this.patterns.length,
       });
 
       return result;
-
     } catch (error) {
-      typographyLogger.error('Processing failed', {
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message
-        } : 'Unknown error',
-        recursionDepth: depth
+      typographyLogger.error("Processing failed", {
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+              }
+            : "Unknown error",
+        recursionDepth: depth,
       });
       throw error;
     }
@@ -148,20 +146,20 @@ export class TypographyProcessor {
     pattern: GeneratedPattern
   ): Promise<string> {
     const regexp = this.getOrCreateRegExp(pattern);
-    const matches = [...text.replaceAll('\n', '\u000A').matchAll(regexp)];
+    const matches = [...text.replaceAll("\n", "\u000A").matchAll(regexp)];
     if (matches.length === 0) return text;
 
-    typographyLogger.debug('Matches found', {
+    typographyLogger.debug("Matches found", {
       pattern: pattern.name,
       matches: matches.length,
-      sampleText: text.replaceAll('\n', '[LF]').substring(0, 100)
+      sampleText: text.replaceAll("\n", "[LF]").substring(0, 100),
     });
 
     let lastIndex = 0;
-    let processedText = '';
+    let processedText = "";
 
     for (const match of matches) {
-      if(match.index! > lastIndex) {
+      if (match.index! > lastIndex) {
         processedText += text.slice(lastIndex, match.index);
       }
 
@@ -169,24 +167,26 @@ export class TypographyProcessor {
         const executor = this.executors.get(pattern.name);
         if (!executor) continue;
 
-        const transformed = await executor.execute({
-          text: match[0],
-          match
-        }, pattern);
+        const transformed = await executor.execute(
+          {
+            text: match[0],
+            match,
+          },
+          pattern
+        );
 
         processedText += transformed.textContent;
 
-        typographyLogger.debug('Transform completed', {
+        typographyLogger.debug("Transform completed", {
           pattern: pattern.name,
           original: match[0],
           transformed: transformed.textContent,
         });
-
       } catch (error) {
-        typographyLogger.warn('Transform failed', {
+        typographyLogger.warn("Transform failed", {
           pattern: pattern.name,
           text: match[0],
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : "Unknown error",
         });
 
         processedText += match[0];
@@ -204,22 +204,24 @@ export class TypographyProcessor {
 
   private sanitizeContent(html: string): string {
     return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: ['p', 'ruby', 'rt', 'rp', 'br', 'h1'],
+      ALLOWED_TAGS: ["p", "ruby", "rt", "rp", "br", "h1"],
       ALLOWED_ATTR: [],
+      FORBID_TAGS: ["script", "style", "iframe"], // 明示的に禁止するタグ
+      FORBID_CONTENTS: ["script", "style"], // コンテンツごと除去
       KEEP_CONTENT: true,
-      PARSER_MEDIA_TYPE: 'text/html'
+      PARSER_MEDIA_TYPE: "text/html",
     });
   }
 
   private sortPatterns(patterns: GeneratedPattern[]): GeneratedPattern[] {
-    typographyLogger.debug('Sorting patterns', {
-      count: patterns.length
+    typographyLogger.debug("Sorting patterns", {
+      count: patterns.length,
     });
 
     return [...patterns].sort((a, b) => {
-      const priorityA = a.priority ?? 0;
-      const priorityB = b.priority ?? 0;
-      return priorityA - priorityB;  // 昇順（小さい数が優先）
+      const priorityA = a.priority ?? a.priority ?? 0;
+      const priorityB = b.priority ?? b.priority ?? 0;
+      return priorityA - priorityB; // 昇順（小さい数が優先）
     });
   }
 }

@@ -5,7 +5,7 @@
  */
 export class TcyConverter {
   process(text: string): string {
-    return text.replace(/†(.+?)‡/g, '<span class="tcy">$1</span>');
+    return text.replace(/〘(.+?)〙/g, '<span class="tcy">$1</span>');
   }
 
   static process(text: string): string {
