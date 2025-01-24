@@ -1,6 +1,7 @@
 import { ProcessorError, ValidationError } from "@/lib/errors";
 import { createContextLogger } from "@/lib/logger";
-import DOMPurify from "dompurify";
+import findAndReplaceDOMText from "findandreplacedomtext";
+import sanitizeHtml from "sanitize-html";
 import type { GeneratedPattern } from "virtual:pattern-config";
 import { TransformExecutor } from "../transform/transform-executor";
 
@@ -10,223 +11,145 @@ export class TypographyProcessor {
   private static instance: TypographyProcessor | null = null;
   private readonly patterns: GeneratedPattern[];
   private readonly executors: Map<string, TransformExecutor>;
-  private readonly compiledPatterns: Map<string, RegExp>; // 正規表現キャッシュ
-  private readonly MAX_RECURSION_DEPTH = 10;
+  private readonly targetTags: string[];
+  private readonly allowedTags: string[];
 
-  private constructor(patterns: GeneratedPattern[]) {
+  private constructor(
+    patterns: GeneratedPattern[],
+    targetTags: string[],
+    allowedTags: string[]
+  ) {
     this.patterns = this.sortPatterns(patterns);
-    this.executors = new Map(
-      this.patterns.map((pattern) => [
-        pattern.name,
-        // テキスト処理のためのExecutorを生成
-        TransformExecutor.fromPattern(pattern),
-      ])
-    );
-
-    // パターンの正規表現を事前にコンパイル
-    this.compiledPatterns = new Map();
-    for (const pattern of this.patterns) {
-      const regexp = this.buildFullPattern(pattern);
-      this.compiledPatterns.set(pattern.name, regexp);
-    }
-
-    typographyLogger.debug("Initialized processor", {
-      patternCount: patterns.length,
-      compiledPatterns: this.compiledPatterns.size,
-    });
+    this.executors = this.initializeExecutors(patterns);
+    this.targetTags = targetTags;
+    this.allowedTags = allowedTags;
   }
 
-  protected buildFullPattern(pattern: GeneratedPattern): RegExp {
-    const { source, flags = "g" } = pattern.pattern;
-    const fullPattern = `${source}`;
-
-    typographyLogger.debug("Building pattern", {
-      pattern: pattern.name,
-      source,
-      flags,
-      fullPattern,
-    });
-
-    return new RegExp(fullPattern, flags);
-  }
-
-  static getInstance(patterns?: GeneratedPattern[]): TypographyProcessor {
-    typographyLogger.debug("Instance requested", {
-      hasPatterns: !!patterns,
-    });
-
+  static getInstance(
+    patterns?: GeneratedPattern[],
+    targetTags: string[] = ["p", "h1", "h2", "h3"],
+    allowedTags: string[] = ["p", "h1", "h2", "h3", "div", "span"]
+  ): TypographyProcessor {
     if (!this.instance) {
       if (!patterns) {
-        typographyLogger.error("Initialization failed", {
-          patterns: !!patterns,
-        });
-        throw new ProcessorError(
-          "TypographyProcessor initialization failed: Required dependencies missing"
-        );
+        throw new ProcessorError("Required dependencies missing");
       }
-
-      this.instance = new TypographyProcessor(patterns);
+      this.instance = new TypographyProcessor(
+        patterns,
+        targetTags,
+        allowedTags
+      );
     }
-
     return this.instance;
   }
 
-  public async process(html: string, depth: number = 0): Promise<string> {
-    if (depth >= this.MAX_RECURSION_DEPTH) {
-      typographyLogger.error("Maximum recursion depth exceeded", {
-        depth,
-        maxDepth: this.MAX_RECURSION_DEPTH,
-        contentLength: html.length,
-        sampleContent: html.slice(0, 100),
-      });
-      throw new ProcessorError(
-        `Typography processing exceeded maximum recursion depth (${this.MAX_RECURSION_DEPTH}). ` +
-          "This might indicate a pattern definition issue."
-      );
-    }
-
+  public async process(html: string): Promise<string> {
     if (!html) {
       throw new ValidationError("HTML content is empty");
     }
 
-    typographyLogger.info("Starting content processing", {
-      contentLength: html.length,
-      recursionDepth: depth,
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = this.sanitizeHtml(html);
+
+    const elements = wrapper.querySelectorAll(this.targetTags.join(","));
+
+    for (const element of elements) {
+      await this.processElement(element);
+    }
+
+    return wrapper.innerHTML;
+  }
+
+  private async processElement(element: Element): Promise<void> {
+    for (const pattern of this.patterns) {
+      const regexp = new RegExp(
+        pattern.pattern.source,
+        pattern.pattern.flags || "g"
+      );
+      const matches = this.findUniqueMatches(element.innerHTML, regexp);
+
+      if (matches.size === 0) continue;
+
+      const transformMap = await this.createTransformMap(matches, pattern);
+      this.applyTransformations(element, regexp, transformMap);
+    }
+  }
+
+  private findUniqueMatches(text: string, regexp: RegExp): Set<string> {
+    const matches = new Set<string>();
+    Array.from(text.matchAll(regexp)).forEach((match) => {
+      matches.add(match[0]);
     });
+    return matches;
+  }
+
+  private async createTransformMap(
+    matches: Set<string>,
+    pattern: GeneratedPattern
+  ): Promise<Map<string, string>> {
+    const transformMap = new Map<string, string>();
+    for (const match of matches) {
+      const transformed = await this.preTransform(pattern, match);
+      transformMap.set(match, transformed);
+    }
+    return transformMap;
+  }
+
+  private applyTransformations(
+    element: Element,
+    regexp: RegExp,
+    transformMap: Map<string, string>
+  ): void {
+    findAndReplaceDOMText(element as HTMLElement, {
+      find: regexp,
+      replace: (portion) => transformMap.get(portion.text) || portion.text,
+      preset: "prose",
+    });
+  }
+
+  private async preTransform(
+    pattern: GeneratedPattern,
+    text: string
+  ): Promise<string> {
+    const executor = this.executors.get(pattern.name);
+    if (!executor) return text;
 
     try {
-      const cleanHtml = this.sanitizeContent(html);
-      let result = cleanHtml;
-
-      // 各パターンで処理
-      for (const pattern of this.patterns) {
-        typographyLogger.debug(`Processing pattern: ${pattern.name}`, {
-          priority: pattern.priority,
-          pattern: {
-            source: pattern.pattern.source,
-            flags: pattern.pattern.flags,
-          },
-        });
-        result = await this.processWithPattern(result, pattern);
-      }
-
-      typographyLogger.info("Processing completed", {
-        patternCount: this.patterns.length,
-      });
-
-      return result;
+      const result = await executor.execute({ text, match: [text] }, pattern);
+      return result.textContent;
     } catch (error) {
-      typographyLogger.error("Processing failed", {
-        error:
-          error instanceof Error
-            ? {
-                name: error.name,
-                message: error.message,
-              }
-            : "Unknown error",
-        recursionDepth: depth,
+      typographyLogger.error("Transform error", {
+        error,
+        pattern: pattern.name,
       });
-      throw error;
+      return text;
     }
   }
 
-  private getOrCreateRegExp(pattern: GeneratedPattern): RegExp {
-    const cached = this.compiledPatterns.get(pattern.name);
-    if (cached) {
-      return cached;
-    }
-
-    const regexp = this.buildFullPattern(pattern);
-    this.compiledPatterns.set(pattern.name, regexp);
-    return regexp;
-  }
-
-  private async processWithPattern(
-    text: string,
-    pattern: GeneratedPattern
-  ): Promise<string> {
-    const regexp = this.getOrCreateRegExp(pattern);
-    const matches = [...text.replaceAll("\n", "\u000A").matchAll(regexp)];
-    if (matches.length === 0) return text;
-
-    typographyLogger.debug("Matches found", {
-      pattern: pattern.name,
-      matches: matches.length,
-      sampleText: text.replaceAll("\n", "[LF]").substring(0, 100),
-    });
-
-    let lastIndex = 0;
-    let processedText = "";
-
-    for (const match of matches) {
-      if (match.index! > lastIndex) {
-        processedText += text.slice(lastIndex, match.index);
-      }
-
-      try {
-        const executor = this.executors.get(pattern.name);
-        if (!executor) {
-          typographyLogger.warn("Executor not found for pattern", {
-            pattern: pattern.name,
-          });
-          continue;
-        }
-
-        const transformed = await executor.execute(
-          {
-            text: match[0],
-            match,
-          },
-          pattern
-        );
-
-        processedText += transformed.textContent;
-
-        typographyLogger.debug("Transform completed", {
-          pattern: pattern.name,
-          original: match[0],
-          transformed: transformed.textContent,
-        });
-      } catch (error) {
-        typographyLogger.warn("Transform failed", {
-          pattern: pattern.name,
-          text: match[0],
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-
-        processedText += match[0];
-      }
-
-      lastIndex = match.index! + match[0].length;
-    }
-
-    if (lastIndex < text.length) {
-      processedText += text.slice(lastIndex);
-    }
-
-    return processedText;
-  }
-
-  private sanitizeContent(html: string): string {
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: ["p", "ruby", "rt", "rp", "br", "h1"],
-      ALLOWED_ATTR: [],
-      FORBID_TAGS: ["script", "style", "iframe"], // 明示的に禁止するタグ
-      FORBID_CONTENTS: ["script", "style"], // コンテンツごと除去
-      KEEP_CONTENT: true,
-      PARSER_MEDIA_TYPE: "text/html",
+  private sanitizeHtml(html: string): string {
+    return sanitizeHtml(html, {
+      allowedTags: this.allowedTags,
+      allowedAttributes: {
+        "*": ["class", "id"],
+      },
     });
   }
 
   private sortPatterns(patterns: GeneratedPattern[]): GeneratedPattern[] {
-    typographyLogger.debug("Sorting patterns", {
-      count: patterns.length,
-    });
-
     return [...patterns].sort((a, b) => {
-      const priorityA = a.priority ?? a.priority ?? 0;
-      const priorityB = b.priority ?? b.priority ?? 0;
-      return priorityA - priorityB; // 昇順（小さい数が優先）
+      const priorityA = a.priority ?? 999999;
+      const priorityB = b.priority ?? 999999;
+      return priorityA - priorityB;
     });
+  }
+
+  private initializeExecutors(
+    patterns: GeneratedPattern[]
+  ): Map<string, TransformExecutor> {
+    const executors = new Map<string, TransformExecutor>();
+    for (const pattern of patterns) {
+      executors.set(pattern.name, TransformExecutor.fromPattern(pattern));
+    }
+    return executors;
   }
 }

@@ -12,7 +12,7 @@ const widthLogger = createContextLogger("convert-width-step");
 
 /**
  * 文字幅変換処理を行うステップクラス
- * 半角/全角の相互変換を提供
+ * 特徴：対象文字種以外の文字はそのまま保持する
  */
 export class ConvertWidthStep extends BaseTransformStep {
   private static readonly SYMBOL_MAP: Record<string, string> = {
@@ -42,7 +42,7 @@ export class ConvertWidthStep extends BaseTransformStep {
     "\\": "＼",
     "]": "］",
     "^": "＾",
-    _: "＿",
+    "\_": "＿",
     "`": "｀",
     "{": "｛",
     "|": "｜",
@@ -56,9 +56,6 @@ export class ConvertWidthStep extends BaseTransformStep {
       Object.entries(ConvertWidthStep.SYMBOL_MAP).map(([k, v]) => [v, k])
     );
 
-  // 正規表現のキャッシュ
-  private static readonly REGEX_CACHE = new Map<string, RegExp>();
-
   constructor(
     private direction: WidthDirection,
     private target: WidthTarget
@@ -70,161 +67,83 @@ export class ConvertWidthStep extends BaseTransformStep {
     });
   }
 
-  override isApplicable(context: TransformContext): boolean {
-    if (!super.isApplicable(context)) return false;
-
-    try {
-      // 対象の文字種が含まれているかチェック
-      const hasTargetChars = this.hasTargetCharacters(context.text);
-
-      widthLogger.debug("Checking applicability", {
-        target: this.target,
-        direction: this.direction,
-        hasTargetChars,
-        textLength: context.text.length,
-      });
-
-      return hasTargetChars;
-    } catch (error) {
-      widthLogger.error("Error in applicability check", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        target: this.target,
-      });
-      return false;
-    }
-  }
-
   protected async processTransform(
     context: TransformContext
   ): Promise<ProcessedText> {
-    if (!this.isApplicable(context)) {
-      widthLogger.error("Invalid text content for width conversion", {
-        target: this.target,
-        direction: this.direction,
-        textLength: context.text.length,
-      });
-      throw new TransformError("文字幅変換処理に失敗しました");
+    if (!super.isApplicable(context)) {
+      throw new TransformError("変換処理対象外です");
     }
-
     try {
-      widthLogger.debug("Starting width conversion", {
-        target: this.target,
-        direction: this.direction,
-        textLength: context.text.length,
-        sampleText: context.text.slice(0, 100),
+      let result = "";
+      for (const char of context.text) {
+        result += this.convertChar(char);
+      }
+
+      widthLogger.debug("Conversion completed", {
+        original: context.text,
+        converted: result,
       });
 
-      const converted = this.convertWidth(context.text);
-
-      widthLogger.debug("Width conversion completed", {
-        textLength: converted.length,
-        sampleText: converted.slice(0, 100),
-      });
-
-      return this.createResult(converted);
+      return this.createResult(result);
     } catch (error) {
-      widthLogger.error("Width conversion failed", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        target: this.target,
-        direction: this.direction,
+      const message = `文字幅変換に失敗しました: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`;
+      widthLogger.error("Conversion failed", {
+        error: message,
+        text: context.text,
       });
-      throw new TransformError("文字幅変換処理中にエラーが発生しました");
+      throw new TransformError(message);
     }
   }
 
-  private hasTargetCharacters(text: string): boolean {
+  /**
+   * 一文字が変換対象かどうかを判定
+   */
+  private isTargetCharacter(char: string): boolean {
     switch (this.target) {
       case "numbers":
-        return /[0-9０-９]/.test(text);
+        // 半角への変換なら全角数字のみ、全角への変換なら半角数字のみを対象に
+        return this.direction === "halfWidth"
+          ? /[０-９]/.test(char)
+          : /[0-9]/.test(char);
       case "alphabet":
-        return /[a-zA-Zａ-ｚＡ-Ｚ]/.test(text);
-      case "symbols": {
-        const symbols =
-          this.direction === "fullWidth"
-            ? Object.keys(ConvertWidthStep.SYMBOL_MAP)
-            : Object.keys(ConvertWidthStep.REVERSE_SYMBOL_MAP);
-        return symbols.some((s) => text.includes(s));
-      }
+        // 同様に、半角への変換なら全角アルファベットのみ、全角への変換なら半角アルファベットのみ
+        return this.direction === "halfWidth"
+          ? /[ａ-ｚＡ-Ｚ]/.test(char)
+          : /[a-zA-Z]/.test(char);
+      case "symbols":
+        // 記号は既存の実装で方向性が考慮されているのでそのまま
+        return this.direction === "fullWidth"
+          ? char in ConvertWidthStep.SYMBOL_MAP
+          : char in ConvertWidthStep.REVERSE_SYMBOL_MAP;
       default:
         return false;
     }
   }
 
-  private convertWidth(text: string): string {
+  /**
+   * 一文字ずつの変換を行う
+   * 対象文字種の場合は変換し、それ以外はそのまま返す
+   */
+  private convertChar(char: string): string {
+    if (!this.isTargetCharacter(char)) {
+      return char;
+    }
+
     switch (this.target) {
       case "numbers":
-      case "alphabet":
-        return this.convertCharWidth(text);
+      case "alphabet": {
+        const offset = this.direction === "fullWidth" ? 0xfee0 : -0xfee0;
+        return String.fromCharCode(char.charCodeAt(0) + offset);
+      }
       case "symbols":
         return this.direction === "fullWidth"
-          ? this.toFullWidth(text)
-          : this.toHalfWidth(text);
+          ? ConvertWidthStep.SYMBOL_MAP[char] || char
+          : ConvertWidthStep.REVERSE_SYMBOL_MAP[char] || char;
       default:
-        return text;
+        return char;
     }
-  }
-
-  private convertCharWidth(text: string): string {
-    const ranges: Record<Exclude<WidthTarget, "symbols">, [string, string]> = {
-      numbers: ["0-9", "０-９"],
-      alphabet: ["A-Za-z", "Ａ-Ｚａ-ｚ"],
-    };
-
-    const [halfRange, fullRange] =
-      ranges[this.target as Exclude<WidthTarget, "symbols">];
-    const pattern = this.getOrCreateRegExp(
-      `[${this.direction === "fullWidth" ? halfRange : fullRange}]`
-    );
-    const offset = this.direction === "fullWidth" ? 0xfee0 : -0xfee0;
-
-    widthLogger.debug("Converting character width", {
-      target: this.target,
-      direction: this.direction,
-      textLength: text.length,
-    });
-
-    return text.replace(pattern, (char) =>
-      String.fromCharCode(char.charCodeAt(0) + offset)
-    );
-  }
-
-  private toFullWidth(text: string): string {
-    widthLogger.debug("Converting to full width", {
-      textLength: text.length,
-    });
-
-    let result = "";
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      result += ConvertWidthStep.SYMBOL_MAP[char] || char;
-    }
-    return result;
-  }
-
-  private toHalfWidth(text: string): string {
-    widthLogger.debug("Converting to half width", {
-      textLength: text.length,
-    });
-
-    let result = "";
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      result += ConvertWidthStep.REVERSE_SYMBOL_MAP[char] || char;
-    }
-    return result;
-  }
-
-  private getOrCreateRegExp(pattern: string): RegExp {
-    const cacheKey = `${pattern}_g`;
-    let regexp = ConvertWidthStep.REGEX_CACHE.get(cacheKey);
-
-    if (!regexp) {
-      regexp = new RegExp(pattern, "g");
-      ConvertWidthStep.REGEX_CACHE.set(cacheKey, regexp);
-    }
-
-    regexp.lastIndex = 0; // リセット
-    return regexp;
   }
 
   toString(): string {

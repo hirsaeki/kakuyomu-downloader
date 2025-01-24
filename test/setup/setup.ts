@@ -1,20 +1,35 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
 // Loggerのモック設定
-vi.mock('@/lib/logger', () => ({
+// デバッグログを出力するかどうかを切り替える
+const DEBUG_LOGGING = false;
+
+vi.mock("@/lib/logger", () => ({
   createContextLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
+    debug: DEBUG_LOGGING
+      ? // eslint-disable-next-line no-console
+        vi.fn((message, ...args) => console.log(`[DEBUG] ${message}`, ...args))
+      : vi.fn(),
+    info: DEBUG_LOGGING
+      ? // eslint-disable-next-line no-console
+        vi.fn((message, ...args) => console.log(`[INFO] ${message}`, ...args))
+      : vi.fn(),
+    warn: DEBUG_LOGGING
+      ? vi.fn((message, ...args) => console.warn(`[WARN] ${message}`, ...args))
+      : vi.fn(),
+    error: DEBUG_LOGGING
+      ? vi.fn((message, ...args) =>
+          console.error(`[ERROR] ${message}`, ...args)
+        )
+      : vi.fn(),
+  }),
 }));
 
 // DOMPurifyのモック設定（必要に応じて）
-vi.mock('dompurify', () => ({
+vi.mock("dompurify", () => ({
   default: {
-    sanitize: (html: string) => html
-  }
+    sanitize: (html: string) => html,
+  },
 }));
 
 // 他のグローバル設定や共通のモックがあれば追加

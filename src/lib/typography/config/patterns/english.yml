@@ -1,6 +1,6 @@
 ---
 description: 英単語関連のパターン
-basePriority: 200
+basePriority: 300
 patterns:
   - name: longEnglishWord
     description: 4文字以上の英単語(先頭alphabetのalphanumeric)は半角に

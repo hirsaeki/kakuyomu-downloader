@@ -32,9 +32,11 @@ export class ContentGenerator {
   private readonly rubyProcessor: RubyProcessor;
   private readonly tcyConverter: TcyConverter;
   private readonly lineBreakProcessor: LineBreakProcessor;
+  private readonly domParser: DOMParser;
 
   constructor() {
     contentLogger.debug('ContentGeneratorを初期化');
+    this.domParser = new DOMParser();
     this.typographyProcessor = TypographyProcessor.getInstance(
       Object.values(patterns)
     );
@@ -160,7 +162,7 @@ export class ContentGenerator {
       });
 
       // Process typography
-      const typographyProcessed = await this.typographyProcessor.process(contentWithTitle);
+      const typographyProcessed = await this.processContentWithStructure(contentWithTitle);
 
       contentLogger.debug('Typography処理完了', {
         type: typeof typographyProcessed,
@@ -168,18 +170,17 @@ export class ContentGenerator {
         firstChars: typographyProcessed.substring(0, 100)
       });
 
-      // 後処理
+      // ルビ変換とTCY処理
       const rubyConverted = this.rubyProcessor.fromAozoraRuby(typographyProcessed);
       const tcyConverted = this.tcyConverter.process(rubyConverted);
-      const lineBreakProcessed = this.lineBreakProcessor.process(tcyConverted);
 
       contentLogger.debug('後処理完了', {
-        textLength: lineBreakProcessed.length,
-        firstChars: lineBreakProcessed.substring(0, 100)
+        textLength: tcyConverted.length,
+        firstChars: tcyConverted.substring(0, 100)
       });
 
       // Create and validate document
-      const doc = this.documentBuilder.createDocument(chapter.title, lineBreakProcessed);
+      const doc = this.documentBuilder.createDocument(chapter.title, tcyConverted);
       
       // Additional debug information
       const contentDiv = doc.querySelector('.content');
@@ -269,5 +270,68 @@ export class ContentGenerator {
     }
 
     return sanitized;
+  }
+
+  /**
+   * HTMLの構造を保持しながらテキストノードのみを処理
+   */
+  private async processContentWithStructure(content: string): Promise<string> {
+    contentLogger.debug('構造を保持した処理を開始', {
+      contentLength: content.length,
+      firstChars: content.substring(0, 100)
+    });
+
+    const doc = this.domParser.parseFromString(content, 'text/html');
+    
+    // テキストノードを再帰的に処理する関数
+    const processTextNodes = async (node: Node): Promise<void> => {
+      // テキストノードの場合
+      if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+        try {
+          // テキストノードの内容のみを処理
+          const processedText = await this.typographyProcessor.process(node.textContent);
+          // 改行処理もテキストノードごとに行う
+          const lineBreakProcessed = this.lineBreakProcessor.process(processedText);
+          node.textContent = lineBreakProcessed;
+
+          contentLogger.debug('テキストノード処理完了', {
+            original: node.textContent?.substring(0, 50),
+            processed: processedText.substring(0, 50)
+          });
+        } catch (error) {
+          contentLogger.warn('テキストノード処理でエラー発生', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            text: node.textContent?.substring(0, 50)
+          });
+        }
+      }
+
+      // 子ノードを再帰的に処理
+      for (const child of Array.from(node.childNodes)) {
+        await processTextNodes(child);
+      }
+    };
+
+    try {
+      // body以下のノードを処理
+      await processTextNodes(doc.body);
+
+      const result = doc.body.innerHTML;
+      contentLogger.debug('構造を保持した処理が完了', {
+        resultLength: result.length,
+        firstChars: result.substring(0, 100)
+      });
+
+      return result;
+    } catch (error) {
+      contentLogger.error('構造を保持した処理でエラー発生', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : 'Unknown error'
+      });
+      throw error;
+    }
   }
 }

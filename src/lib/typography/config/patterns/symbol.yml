@@ -1,6 +1,6 @@
 ---
 description: 記号に関するパターン
-basePriority: 300
+basePriority: 200
 patterns:
   - name: doubleExclamationQuestion
     description: 2連続の感嘆符・疑問符を縦中横に変換し、spanタグを閉じたあとに全角スペースがあることを保証する。
@@ -73,7 +73,7 @@ patterns:
     description: 基本的な記号を全角に変換
     pattern:
       source: |-
-        []#$%&*+\-/=@\\^_`{|}~:;<>()[]
+        [#$%&*+\-\/=@\\^_`{|}~:;()<>\[\]]
     transform:
       type: text
       steps:

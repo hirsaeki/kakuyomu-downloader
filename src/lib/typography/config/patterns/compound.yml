@@ -5,49 +5,60 @@ patterns:
   - name: dateFormat
     description: 日付を漢数字に変換
     pattern:
-      source: "[0-9０-９〇一二三四五六七八九]{4}年[0-9０-９]{1,2}月[0-9０-９]{1,2}日"
+      source: |-
+        [0-9０-９〇一二三四五六七八九]{4}年[0-9０-９]{1,2}月[0-9０-９]{1,2}日
     transform:
       type: text
       steps:
         - action: convertKanji
         - action: replace
-          from: (.*)年(.*)月(.*)日
-          to: $1年$2月$3日
+          from: |-
+            (.*)年(.*)月(.*)日
+          to: |-
+            $1年$2月$3日
 
   - name: fractionFormat
     description: 分数を漢数字に変換
     pattern:
-      source: "[0-9０-９〇一二三四五六七八九]+[/／][0-9０-９〇一二三四五六七八九]+"
+      source: |-
+        [0-9０-９〇一二三四五六七八九]+[/／][0-9０-９〇一二三四五六七八九]+
     transform:
       type: text
       steps:
         - action: convertKanji
         - action: replace
-          from: (.*)[/／](.*)
-          to: $2分の$1
+          from: |-
+            (.*)[/／](.*)
+          to: |-
+            $2分の$1
 
   - name: decimalFormat
     description: 小数を漢数字と中黒に変換
     pattern:
-      source: "[0-9０-９〇一二三四五六七八九]+[.・．][0-9０-９〇一二三四五六七八九]+"
+      source: |-
+        [0-9０-９〇一二三四五六七八九]+[.・．][0-9０-９〇一二三四五六七八九]+
     transform:
       type: text
       ensureSpace:
         after: true
       steps:
         - action: replace
-          from: "[.・．]"
+          from: |-
+            [.・．]
           to: ・
         - action: convertKanji
 
   - name: eraFormat
     description: 元号年を漢数字に変換
     pattern:
-      source: (明治|大正|昭和|平成|令和)([0-9０-９]{1,2}年
+      source: |-
+        (明治|大正|昭和|平成|令和)([0-9０-９]{1,2})年
     transform:
       type: text
       steps:
         - action: convertKanji
         - action: replace
-          from: (明治|大正|昭和|平成|令和)(.*)年
-          to: $1$2年
+          from: |-
+            (明治|大正|昭和|平成|令和)(.*)年
+          to: |-
+            $1$2年

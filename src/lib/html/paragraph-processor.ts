@@ -1,6 +1,6 @@
-import { createContextLogger } from '@/lib/logger';
+import { createContextLogger } from "@/lib/logger";
 
-const paragraphLogger = createContextLogger('paragraph-processor');
+const paragraphLogger = createContextLogger("paragraph-processor");
 
 interface ParagraphProcessorOptions {
   /** 段落区切りと看做す最小の空行数（デフォルト: 2） */
@@ -19,7 +19,7 @@ class ParagraphProcessor {
     this.options = {
       minEmptyLines: 2,
       debug: false,
-      ...options
+      ...options,
     };
   }
 
@@ -30,12 +30,12 @@ class ParagraphProcessor {
    */
   process(text: string): string {
     if (!text) {
-      paragraphLogger.debug('Empty text provided, returning as is');
+      paragraphLogger.debug("Empty text provided, returning as is");
       return text;
     }
 
     // テキストを行単位で分割
-    const lines = text.split('\n');
+    const lines = text.split("\n");
     const processedLines: string[] = [];
     let currentParagraph: string[] = [];
     let emptyLineCount = 0;
@@ -53,32 +53,31 @@ class ParagraphProcessor {
         if (emptyLineCount >= this.options.minEmptyLines) {
           if (currentParagraph.length > 0) {
             // 現在の段落を<p>タグで囲んで追加
-            processedLines.push(this.wrapParagraph(currentParagraph.join('\n')));
+            processedLines.push(
+              this.wrapParagraph(currentParagraph.join("\n"))
+            );
             currentParagraph = [];
           }
           emptyLineCount = 0;
-          
         } else if (emptyLineCount === 1) {
-            // 1行空行の場合は改行タグを追加
-            currentParagraph.push('<br />');
-            emptyLineCount = 0;
+          emptyLineCount = 0;
         }
-        currentParagraph.push(line + '<br />');
+        currentParagraph.push(line);
       }
     }
 
     // 最後の段落の処理
     if (currentParagraph.length > 0) {
-      processedLines.push(this.wrapParagraph(currentParagraph.join('\n')));
+      processedLines.push(this.wrapParagraph(currentParagraph.join("\n")));
     }
 
-    const result = processedLines.join('\n\n');
+    const result = processedLines.join("\n\n");
 
     if (this.options.debug) {
-      paragraphLogger.debug('Processed text:', {
+      paragraphLogger.debug("Processed text:", {
         originalLength: text.length,
         processedLength: result.length,
-        paragraphCount: processedLines.length
+        paragraphCount: processedLines.length,
       });
     }
 
@@ -86,7 +85,7 @@ class ParagraphProcessor {
   }
 
   /**
-   * テキストを<p>タグで囲む 段落開始一字下げ
+   * テキストを<p>タグで囲む
    */
   private wrapParagraph(text: string): string {
     return `<p>\n${text}\n</p>`;

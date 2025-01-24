@@ -8,96 +8,40 @@ const kanjiLogger = createContextLogger("convert-kanji-step");
 
 /**
  * 数値を漢数字に変換するステップ
+ * 特徴：数字以外の文字はそのまま保持する
  */
 export class ConvertKanjiStep extends BaseTransformStep {
   private static readonly KANJI_NUMS = [
-    "〇",
-    "一",
-    "二",
-    "三",
-    "四",
-    "五",
-    "六",
-    "七",
-    "八",
-    "九",
+    "〇", "一", "二", "三", "四",
+    "五", "六", "七", "八", "九",
   ] as const;
-  private static readonly NUMBER_PATTERN = /^[0-9０-９]+$/; // 全角、半角に対応
-  private static readonly MAX_SAFE_LENGTH = 16; // 安全に処理可能な最大桁数
-  private readonly widthConverter = new ConvertWidthStep(
-    "halfWidth",
-    "numbers"
-  );
+
+  private static readonly NUMBER_PATTERN = /[0-9０-９]/; // 一文字の判定に変更
+  private readonly widthConverter = new ConvertWidthStep("halfWidth", "numbers");
 
   constructor() {
     super();
     kanjiLogger.debug("Initialized kanji converter");
   }
 
-  override isApplicable(context: TransformContext): boolean {
-    if (!super.isApplicable(context)) return false;
-
-    try {
-      const trimmed = context.text.trim();
-      const isValidNumber = ConvertKanjiStep.NUMBER_PATTERN.test(trimmed);
-
-      kanjiLogger.debug("Checking applicability", {
-        text: context.text,
-        textLength: context.text.length,
-        trimmedLength: trimmed.length,
-        isValidNumber,
-      });
-
-      if (trimmed.length > ConvertKanjiStep.MAX_SAFE_LENGTH) {
-        kanjiLogger.warn("Text exceeds safe length", {
-          length: trimmed.length,
-          maxSafe: ConvertKanjiStep.MAX_SAFE_LENGTH,
-        });
-        return false;
-      }
-
-      return isValidNumber;
-    } catch (error) {
-      kanjiLogger.error("Error in applicability check", {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-      return false;
-    }
-  }
-
   protected async processTransform(
     context: TransformContext
   ): Promise<ProcessedText> {
-    kanjiLogger.debug("Starting kanji conversion", {
-      textLength: context.text.length,
-      text: context.text,
-    });
-
+    if (!super.isApplicable(context)) {
+      throw new TransformError("変換処理対象外です");
+    }
     try {
-      const trimmed = context.text.trim();
-
-      // まず全角数字を半角数字に変換
-      const halfWidthResult = await this.widthConverter.execute({
-        text: trimmed,
-      });
-      const halfWidthText = halfWidthResult.textContent;
-
-      // 数値の妥当性チェック
-      if (!/^\d+$/.test(halfWidthText)) {
-        throw new Error("Invalid number format after halfWidth conversion");
+      let result = '';
+      for (const char of context.text) {
+        result += await this.convertChar(char);
       }
 
-      // 漢数字への変換
-      const converted = this.convertToKanji(halfWidthText);
-
       kanjiLogger.debug("Conversion completed", {
-        originalLength: context.text.length,
-        resultLength: converted.length,
         original: context.text,
-        converted,
+        converted: result,
       });
 
-      return this.createResult(converted);
+      return this.createResult(result);
     } catch (error) {
       const message = `漢数字変換に失敗しました: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -111,19 +55,26 @@ export class ConvertKanjiStep extends BaseTransformStep {
   }
 
   /**
-   * 数値文字列を漢数字に変換
+   * 一文字ずつの変換を行う
+   * 数字の場合は漢数字に変換し、それ以外はそのまま返す
    */
-  private convertToKanji(numberStr: string): string {
-    return numberStr
-      .split("")
-      .map((digit) => {
-        const num = parseInt(digit, 10);
-        if (isNaN(num) || num < 0 || num > 9) {
-          throw new Error(`Invalid digit: ${digit}`);
-        }
-        return ConvertKanjiStep.KANJI_NUMS[num];
-      })
-      .join("");
+  private async convertChar(char: string): Promise<string> {
+    if (!ConvertKanjiStep.NUMBER_PATTERN.test(char)) {
+      return char;
+    }
+
+    // 全角数字は一度半角に変換してから処理
+    if (/[０-９]/.test(char)) {
+      const halfWidth = await this.widthConverter.execute({ text: char });
+      char = halfWidth.textContent;
+    }
+
+    // この時点でcharは半角数字のはず
+    const num = parseInt(char, 10);
+    if (isNaN(num) || num < 0 || num > 9) {
+      throw new Error(`Invalid digit: ${char}`);
+    }
+    return ConvertKanjiStep.KANJI_NUMS[num];
   }
 
   toString(): string {

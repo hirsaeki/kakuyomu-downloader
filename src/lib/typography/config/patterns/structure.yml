@@ -7,13 +7,15 @@ patterns:
       行頭字下げ
       例: ^こんにちは → 　こんにちは
     pattern:
-      source: ^[\\t 　]*
+      source: |-
+        ^[\\t 　]*
       flags: gm
     transform:
       type: text
       steps:
         - action: replace
-          from: ^[\\t 　]*
+          from: |-
+            ^[\\t 　]*
           to: "　"
 
   - name: lineWithHeadingQuotes
@@ -24,22 +26,27 @@ patterns:
       例: ^　'こんにちは。' → 『こんにちは』
       例: ^　'こんにちは' → 『こんにちは』
     pattern:
-      source: ^[\\t 　]*([\"”\'’]).*\\1$
+      source: |-
+        ^[\\t 　]*([\"”\'’]).*\\1$
       flags: gm
     transform:
       type: text
       steps:
         - action: replace
-          from: (?<!。)。?[\"”]$
+          from: -|
+            (?<!。)。?[\"”]$
           to: "」"
         - action: replace
-          from: (?<!。)。[\'’]$
+          from: |-
+            (?<!。)。[\'’]$
           to: 』
         - action: replace
-          from: ^[\\t 　]*[\"”]
+          from: |-
+            ^[\\t 　]*[\"”]
           to: "「"
         - action: replace
-          from: ^[\\t 　]*[\'’]
+          from: -|
+            ^[\\t 　]*[\'’]
           to: "『"
 
   - name: periodsBeforeClosingBrackets
@@ -48,7 +55,8 @@ patterns:
       例: こんにちは。」 → こんにちは」
       例: さようなら。』 → さようなら』
     pattern:
-      source: (?<!。)。([」』])
+      source: |-
+        (?<!。)。([」』])
     transform:
       type: text
       steps:
@@ -62,7 +70,8 @@ patterns:
       例: ^　「こんにちは」 → 「こんにちは」
       例: ^　『こんにちは』 → 『こんにちは』
     pattern:
-      source: ^[\\t 　]*[「『]"
+      source: |-
+        ^[\\t 　]*[「『]"
       flags: gm
     transform:
       type: text
@@ -70,3 +79,37 @@ patterns:
         - action: replace
           from: ^[\\t 　]*
           to: ""
+
+  - name: deleteEmptyLinesBeforeBrackets
+    description: |
+      カギカッコの前の空行を削除
+      例: \n\n「こんにちは」 → \n「こんにちは」
+      例: \n\n『こんにちは』 → \n『こんにちは』
+    pattern:
+      source: |-
+        (\r\n|\r|\n)[\s　]*(\r\n|\r|\n)[「『]
+      flags: g
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: |-
+            (\r\n|\r|\n)[\s　]*(\r\n|\r|\n)
+          to: "\n"
+
+  - name: deleteEmptyLinesAfterBrackets
+    description: |
+      カギカッコの後の空行を削除
+      例: 「こんにちは」\n\n → 「こんにちは」\n
+      例: 『こんにちは』\n\n → 『こんにちは』\n
+    pattern:
+      source: |-
+        [」』](\r\n|\r|\n)[\s　]*(\r\n|\n|\r)
+      flags: g
+    transform:
+      type: text
+      steps:
+        - action: replace
+          from: |-
+            (\r\n|\r|\n)[\s　]*(\r\n|\r|\n)
+          to: "\n"
