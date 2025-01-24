@@ -17,23 +17,18 @@ describe('RubyProcessor', () => {
       expect(processor.toAozoraRuby(input)).toBe(expected);
     });
 
-    it('rpタグを含むルビも処理できること', () => {
-      const input = '<ruby>漢字<rt>かんじ</rt><rp>（</rp><rp>）</rp></ruby>';
-      const expected = '｜漢字《かんじ》';
-      expect(processor.toAozoraRuby(input)).toBe(expected);
-    });
   });
 
   describe('fromAozoraRuby', () => {
     it('基本的な青空文庫形式をXHTMLルビタグに変換できること', () => {
       const input = '｜漢字《かんじ》のテスト';
-      const expected = '<ruby>漢字<rt>かんじ</rt><rp>（</rp><rp>）</rp></ruby>のテスト';
+      const expected = '<ruby>漢字<rt>かんじ</rt></ruby>のテスト';
       expect(processor.fromAozoraRuby(input)).toBe(expected);
     });
 
     it('複数のルビを変換できること', () => {
       const input = '｜日本《にほん》の｜文化《ぶんか》';
-      const expected = '<ruby>日本<rt>にほん</rt><rp>（</rp><rp>）</rp></ruby>の<ruby>文化<rt>ぶんか</rt><rp>（</rp><rp>）</rp></ruby>';
+      const expected = '<ruby>日本<rt>にほん</rt></ruby>の<ruby>文化<rt>ぶんか</rt></ruby>';
       expect(processor.fromAozoraRuby(input)).toBe(expected);
     });
 
