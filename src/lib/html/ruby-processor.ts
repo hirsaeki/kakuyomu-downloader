@@ -16,9 +16,17 @@ export class RubyProcessor {
       textLength: html.length
     });
 
-    const result = html.replace(
-      /<ruby>(.+?)<rt>(.+?)<\/rt>(?:<rp>.+?<\/rp>)?<\/ruby>/g,
-      '｜$1《$2》'
+    // 1. まず全てのrp要素を除去
+    let result = html.replace(/<rp>.*?<\/rp>/g, '');
+    
+    // 2. 全てのruby要素を変換
+    result = result.replace(
+      /<ruby>(?:<rb>)?([^<]+)(?:<\/rb>)?<rt>([^<]+)<\/rt>(?:<rtc>.*?<\/rtc>)?<\/ruby>/g,
+      (_, base, ruby) => {
+        // 漢字のみの場合は｜を省略
+        const prefix = /^[一-龯々]+$/.test(base) ? '' : '｜';
+        return `${prefix}${base}《${ruby}》`;
+      }
     );
 
     rubyLogger.debug('青空文庫形式への変換が完了', {
