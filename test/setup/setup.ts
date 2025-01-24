@@ -33,3 +33,16 @@ vi.mock("dompurify", () => ({
 }));
 
 // 他のグローバル設定や共通のモックがあれば追加
+
+// DOMParserのモック実装
+// ブラウザ環境でのtextContent取得を単純化して模倣
+global.DOMParser = class {
+  parseFromString(html: string, _type: string) {
+    return {
+      body: {
+        // シンプルなHTMLタグの除去とスペース・改行の保持
+        textContent: html.replace(/<[^>]+>/g, '')
+      }
+    };
+  }
+} as any;

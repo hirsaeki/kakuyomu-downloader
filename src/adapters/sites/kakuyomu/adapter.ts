@@ -6,6 +6,7 @@ import { NETWORK_CONFIG } from '@/config/constants';
 import { AppError, ValidationError, NetworkError } from '@/lib/errors';
 import { Episode } from '@/types';
 import { createContextLogger } from '@/lib/logger';
+import { EmphasisProcessor } from '@/lib/html/emphasis-processor';
 import { RubyProcessor } from '@/lib/html/ruby-processor';
 import { ParagraphProcessor } from '@/lib/html/paragraph-processor';
 
@@ -432,13 +433,23 @@ export class KakuyomuAdapter extends BaseNovelSiteAdapter<KakuyomuResponse> {
     }
   
     try {
-      // 本文を青空文庫形式のルビに変換
-      const rubyProcessor = new RubyProcessor();
-      const rubyProcessed = rubyProcessor.toAozoraRuby(contentElement.innerHTML);
+      // 1. 傍点を独自記法に変換
+      const emphasisProcessor = new EmphasisProcessor();
+      const emphasisProcessed = emphasisProcessor.toEmphasisNotation(contentElement.innerHTML);
 
-      // 改行が含まれるようにして段落処理
+      // 2. 本文を青空文庫形式のルビに変換
+      const rubyProcessor = new RubyProcessor();
+      const rubyProcessed = rubyProcessor.toAozoraRuby(emphasisProcessed);
+
+      // 3. テキストを抽出して段落処理
       const paragraphProcessor = new ParagraphProcessor();
       const content = paragraphProcessor.process(rubyProcessed);
+
+      adapterLogger.debug('コンテンツ変換処理', {
+        emphasisLength: emphasisProcessed.length,
+        rubyLength: rubyProcessed.length,
+        finalLength: content.length
+      });
 
       adapterLogger.info('エピソード内容解析完了', {
         title: titleElement.textContent.trim(),

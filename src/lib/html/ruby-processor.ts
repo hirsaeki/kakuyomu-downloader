@@ -47,9 +47,10 @@ export class RubyProcessor {
       textLength: text.length
     });
 
+    // ｜付きと漢字のみの両方のパターンを処理
     const result = text.replace(
-      /｜(.+?)《(.+?)》/g,
-      '<ruby>$1<rt>$2</rt><rp>（</rp><rp>）</rp></ruby>'
+      /(｜([^《]+?)|([一-龯々]+))《([^》]+?)》/g,
+      (_, __, p1, kanji, ruby) => `<ruby>${p1 || kanji}<rt>${ruby}</rt></ruby>`
     );
 
     rubyLogger.debug('XHTMLへの変換が完了', {

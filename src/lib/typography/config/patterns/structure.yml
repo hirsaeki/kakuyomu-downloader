@@ -35,19 +35,27 @@ patterns:
         - action: replace
           from: -|
             (?<!。)。?[\"”]$
-          to: "」"
+          to: 」
+        - action: replace
+          from: -|
+            (?<!。)[\"”]$
+          to: 」
         - action: replace
           from: |-
             (?<!。)。[\'’]$
           to: 』
         - action: replace
           from: |-
+            (?<!。)[\'’]$
+          to: 』
+        - action: replace
+          from: |-
             ^[\\t 　]*[\"”]
-          to: "「"
+          to: 「
         - action: replace
           from: -|
             ^[\\t 　]*[\'’]
-          to: "『"
+          to: 『
 
   - name: periodsBeforeClosingBrackets
     description: |

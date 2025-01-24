@@ -24,58 +24,69 @@ class ParagraphProcessor {
   }
 
   /**
+   * HTMLからテキストコンテンツを抽出する
+   * @param html HTMLテキスト
+   * @returns 純粋なテキストコンテンツ
+   */
+  private extractTextContent(html: string): string {
+    if (!html) return html;
+
+    // ブラウザ提供のDOMParserを使用
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    // textContentで純粋なテキストを取得（改行やスペースは保持される）
+    return doc.body.textContent || '';
+  }
+
+  /**
    * テキストを段落処理して返す
-   * @param text 処理対象のテキスト
+   * @param html 処理対象のHTMLテキスト
    * @returns 段落処理されたテキスト
    */
-  process(text: string): string {
-    if (!text) {
+  process(html: string): string {
+    if (!html) {
       paragraphLogger.debug("Empty text provided, returning as is");
-      return text;
+      return html;
     }
 
+    // まずHTMLから純粋なテキストを抽出
+    const plainText = this.extractTextContent(html);
+
     // テキストを行単位で分割
-    const lines = text.split("\n");
+    const lines = plainText.split(/\r?\n/);
     const processedLines: string[] = [];
     let currentParagraph: string[] = [];
     let emptyLineCount = 0;
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmedLine = line.trim();
+      const line = lines[i].trim();
 
       // 空行判定（スペースのみの行も空行とみなす）
-      if (!trimmedLine) {
+      if (!line) {
         emptyLineCount++;
-      } else {
-        // 空行でない場合
-        // 段落区切り判定(空行の閾値越え)
-        if (emptyLineCount >= this.options.minEmptyLines) {
-          if (currentParagraph.length > 0) {
-            // 現在の段落を<p>タグで囲んで追加
-            processedLines.push(
-              this.wrapParagraph(currentParagraph.join("\n"))
-            );
-            currentParagraph = [];
-          }
-          emptyLineCount = 0;
-        } else if (emptyLineCount === 1) {
-          emptyLineCount = 0;
-        }
-        currentParagraph.push(line);
+        continue;
       }
+
+      // 段落区切り判定(空行の閾値越え)
+      if (emptyLineCount >= this.options.minEmptyLines && currentParagraph.length > 0) {
+        processedLines.push(this.wrapParagraph(currentParagraph.join('\n')));
+        currentParagraph = [];
+      }
+
+      currentParagraph.push(line);
+      emptyLineCount = 0;
     }
 
     // 最後の段落の処理
     if (currentParagraph.length > 0) {
-      processedLines.push(this.wrapParagraph(currentParagraph.join("\n")));
+      processedLines.push(this.wrapParagraph(currentParagraph.join('\n')));
     }
 
-    const result = processedLines.join("\n\n");
+    // 段落間に改行を入れて結合（後続のLineBreakProcessorで<br />に変換される）
+    const result = processedLines.join('\n\n');
 
     if (this.options.debug) {
       paragraphLogger.debug("Processed text:", {
-        originalLength: text.length,
+        originalLength: html.length,
         processedLength: result.length,
         paragraphCount: processedLines.length,
       });
@@ -86,9 +97,10 @@ class ParagraphProcessor {
 
   /**
    * テキストを<p>タグで囲む
+   * 段落の前後には意図的に改行を入れない（段落間の改行はjoin時に挿入）
    */
   private wrapParagraph(text: string): string {
-    return `<p>\n${text}\n</p>`;
+    return `<p>${text}</p>`;
   }
 }
 
