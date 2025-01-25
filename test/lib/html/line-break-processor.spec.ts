@@ -1,61 +1,112 @@
+import { describe, expect, it, beforeEach } from "vitest";
+import { JSDOM } from "jsdom";
 import { LineBreakProcessor } from "@/lib/html/line-break-processor";
-import { describe, expect, it } from "vitest";
 
 describe("LineBreakProcessor", () => {
-  const processor = new LineBreakProcessor();
+  let processor: LineBreakProcessor;
+  let document: Document;
 
-  describe("process", () => {
-    it("プレーンテキストの改行を<br />タグに変換すること", () => {
-      const input = "これは\n改行を含む\nテキストです";
-      const expected = "これは<br />\n改行を含む<br />\nテキストです";
-      expect(processor.process(input)).toBe(expected);
+  beforeEach(() => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+    document = dom.window.document;
+    processor = new LineBreakProcessor();
+
+    // DOMParserのモック
+    global.DOMParser = class DOMParser {
+      parseFromString(string: string, _: string) {
+        return new JSDOM(string).window.document;
+      }
+    } as any;
+  });
+
+  describe("insertLineBreaks", () => {
+    it("プレーンテキストの改行を<br>タグに変換すること", () => {
+      const div = document.createElement('div');
+      div.textContent = "これは\n改行を含む\nテキストです";
+      
+      processor.insertLineBreaks(div);
+      
+      // textContentではなくinnerHTMLを使用して<br>タグを確認
+      expect(div.innerHTML).toBe("これは<br>改行を含む<br>テキストです");
     });
 
-    it("タグ内のテキストノードの改行を処理すること", () => {
-      const input = "<p>これは\n段落内の\n改行</p>";
-      const expected = "<p>これは<br />\n段落内の<br />\n改行</p>";
-      expect(processor.process(input)).toBe(expected);
+    it("複数のテキストノードの改行を処理すること", () => {
+      const div = document.createElement('div');
+      const p1 = document.createElement('p');
+      const p2 = document.createElement('p');
+      
+      p1.textContent = "最初の\n段落";
+      p2.textContent = "次の\n段落";
+      div.appendChild(p1);
+      div.appendChild(p2);
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe("<p>最初の<br>段落</p><p>次の<br>段落</p>");
     });
 
     it("ネストされたタグ内の改行を処理すること", () => {
-      const input = "<div><p>最初の\n段落</p><p>次の\n段落</p></div>";
-      const expected =
-        "<div><p>最初の<br />\n段落</p><p>次の<br />\n段落</p></div>";
-      expect(processor.process(input)).toBe(expected);
+      const div = document.createElement('div');
+      div.innerHTML = "<span>これは\nネストされた\nテキスト</span>";
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe("<span>これは<br>ネストされた<br>テキスト</span>");
     });
 
-    it("タグの属性を保持したまま改行を処理すること", () => {
-      const input = '<p class="test">属性付き\nタグ</p>';
-      const expected = '<p class="test">属性付き<br />\nタグ</p>';
-      expect(processor.process(input)).toBe(expected);
+    it("属性を持つタグ内の改行を処理すること", () => {
+      const div = document.createElement('div');
+      const p = document.createElement('p');
+      p.setAttribute('class', 'test');
+      p.textContent = "属性付き\nタグ";
+      div.appendChild(p);
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe('<p class="test">属性付き<br>タグ</p>');
     });
 
     it("改行を含まないテキストはそのまま返すこと", () => {
-      const input = "<p>これは改行を含まないテキストです</p>";
-      expect(processor.process(input)).toBe(input);
+      const div = document.createElement('div');
+      div.textContent = "これは改行を含まないテキストです";
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe("これは改行を含まないテキストです");
     });
 
     it("連続した改行も正しく処理すること", () => {
-      const input = "<p>これは\n\n連続した\n\n改行です</p>";
-      const expected =
-        "<p>これは<br />\n<br />\n連続した<br />\n<br />\n改行です</p>";
-      expect(processor.process(input)).toBe(expected);
+      const div = document.createElement('div');
+      div.textContent = "これは\n\n連続した\n\n改行です";
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe("これは<br><br>連続した<br><br>改行です");
     });
 
-    it("ノードの外側の改行も正しく処理すること", () => {
-      const input = "<p>これは</p>\n\n<p>段落外改行です</p>";
-      const expected = "<p>これは</p><br />\n<br />\n<p>段落外改行です</p>";
-      expect(processor.process(input)).toBe(expected);
+    it("タグの間の改行も正しく処理すること", () => {
+      const div = document.createElement('div');
+      div.innerHTML = "<p>最初</p>\n\n<p>次</p>";
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe("<p>最初</p><br><br><p>次</p>");
     });
 
-    it("空文字列を処理できること", () => {
-      expect(processor.process("")).toBe("");
+    it("空のDOM要素を処理できること", () => {
+      const div = document.createElement('div');
+
+      processor.insertLineBreaks(div);
+
+      expect(div.innerHTML).toBe("");
     });
 
-    it("無効なタグを含む場合も正しく処理すること", () => {
-      const input = "<invalid>これは\n無効なタグ</invalid>";
-      const expected = "これは<br />\n無効なタグ"; // 無効なタグは除去される
-      expect(processor.process(input)).toBe(expected);
+    it("エラー時は例外をスローすること", () => {
+      const div = null as any;
+
+      expect(() => {
+        processor.insertLineBreaks(div);
+      }).toThrow();
     });
   });
 });
