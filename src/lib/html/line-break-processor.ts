@@ -41,7 +41,10 @@ export class LineBreakProcessor {
           processedHtml += this.process(node.content);
         } else if (node.type === "text") {
           // テキストの場合は改行を<br />に変換
-          processedHtml += node.content.replace(/\n/g, "<br />\n");
+          // 単純なHTMLフラグメントとして処理
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = node.content.replace(/\n/g, '<br />\n');
+          processedHtml += tempDiv.innerHTML;
         } else {
           // 有効なタグの場合はコンテンツを再帰的に処理
           if (node.content) {
