@@ -7,6 +7,82 @@ const rubyLogger = createContextLogger('ruby-processor');
  */
 export class RubyProcessor {
   /**
+   * DOM要素内の青空文庫形式のルビ記法をXHTMLルビタグに変換する
+   * @param element 処理対象のDOM要素
+   */
+  insertRuby(element: HTMLElement): void {
+    rubyLogger.debug('ルビ変換処理を開始', { elementId: element.id });
+
+    try {
+      const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      let node: Text | null;
+      while (node = walker.nextNode() as Text) {
+        const text = node.textContent || '';
+
+        if (text.includes('《')) {
+          rubyLogger.debug('ルビ記法を含むテキストノードを検出', {
+            text: text.substring(0, 50)
+          });
+
+          const fragment = document.createDocumentFragment();
+          let lastIndex = 0;
+
+          // ｜付きと漢字のみの両方のパターンを処理
+          const matches = text.matchAll(/(｜([^《]+?)|([一-龯々]+))《([^》]+?)》/g);
+          for (const match of matches) {
+            const [fullMatch, _, p1, kanji, rubyText] = match;
+            const startIndex = match.index!;
+
+            // Add text before ruby
+            if (startIndex > lastIndex) {
+              fragment.appendChild(
+                document.createTextNode(text.slice(lastIndex, startIndex))
+              );
+            }
+
+            // Add ruby element
+            const ruby = document.createElement('ruby');
+            ruby.textContent = p1 || kanji;  // 本文
+            const rt = document.createElement('rt');
+            rt.textContent = rubyText;  // ルビ
+            ruby.appendChild(rt);
+            fragment.appendChild(ruby);
+
+            lastIndex = startIndex + fullMatch.length;
+          }
+
+          // Add remaining text
+          if (lastIndex < text.length) {
+            fragment.appendChild(
+              document.createTextNode(text.slice(lastIndex))
+            );
+          }
+
+          node.replaceWith(fragment);
+        }
+      }
+
+      rubyLogger.debug('ルビ変換処理が完了');
+
+    } catch (error) {
+      rubyLogger.error('ルビ変換処理でエラーが発生', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : 'Unknown error'
+      });
+      // DOM操作の失敗は上位で処理する
+      throw error;
+    }
+  }
+
+  /**
    * XHTMLのルビタグを青空文庫形式のルビ記法に変換する
    * @param html XHTMLルビタグを含むテキスト
    * @returns 青空文庫形式のルビ記法に変換されたテキスト
@@ -38,30 +114,6 @@ export class RubyProcessor {
   }
 
   /**
-   * 青空文庫形式のルビ記法をXHTMLのルビタグに変換する
-   * @param text 青空文庫形式のルビ記法を含むテキスト
-   * @returns XHTMLのルビタグに変換されたテキスト
-   */
-  fromAozoraRuby(text: string): string {
-    rubyLogger.debug('青空文庫形式からXHTMLへの変換を開始', {
-      textLength: text.length
-    });
-
-    // ｜付きと漢字のみの両方のパターンを処理
-    const result = text.replace(
-      /(｜([^《]+?)|([一-龯々]+))《([^》]+?)》/g,
-      (_, __, p1, kanji, ruby) => `<ruby>${p1 || kanji}<rt>${ruby}</rt></ruby>`
-    );
-
-    rubyLogger.debug('XHTMLへの変換が完了', {
-      processedLength: result.length,
-      sampleText: result.slice(0, 100)
-    });
-
-    return result;
-  }
-
-  /**
    * クラスメソッドとしてのtoAozoraRuby
    * @param html XHTMLルビタグを含むテキスト
    * @returns 青空文庫形式のルビ記法に変換されたテキスト
@@ -69,15 +121,5 @@ export class RubyProcessor {
   static toAozoraRuby(html: string): string {
     const processor = new RubyProcessor();
     return processor.toAozoraRuby(html);
-  }
-
-  /**
-   * クラスメソッドとしてのfromAozoraRuby
-   * @param text 青空文庫形式のルビ記法を含むテキスト
-   * @returns XHTMLのルビタグに変換されたテキスト
-   */
-  static fromAozoraRuby(text: string): string {
-    const processor = new RubyProcessor();
-    return processor.fromAozoraRuby(text);
   }
 }
