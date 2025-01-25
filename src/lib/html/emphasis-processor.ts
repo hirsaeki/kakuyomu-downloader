@@ -7,32 +7,37 @@ const emphasisLogger = createContextLogger("emphasis-processor");
  */
 export class EmphasisProcessor {
   /**
-   * DOM要素内の傍点記法をXHTML傍点タグに変換する
-   * @param element 処理対象のDOM要素
+   * 独自記法をXHTML傍点タグに変換する
+   * @param text 独自記法を含むテキスト
+   * @returns XHTML傍点タグに変換されたテキスト
    */
-  fromEmphasisNotation(element: HTMLElement): void {
-    emphasisLogger.debug("傍点変換処理を開始", { elementId: element.id });
+  fromEmphasisNotation(text: string): string {
+    emphasisLogger.debug("傍点変換処理を開始", { textLength: text.length });
 
     try {
+      const div = document.createElement('div');
+      div.textContent = text;
+
       const walker = document.createTreeWalker(
-        element,
+        div,
         NodeFilter.SHOW_TEXT,
         null
       );
 
-      let node: Text | null;
-      while ((node = walker.nextNode() as Text)) {
-        const text = node.textContent || "";
+      let currentNode = walker.nextNode();
+      while (currentNode) {
+        const node = currentNode as Text;
+        const nodeText = node.textContent || "";
 
-        if (text.includes("《《")) {
+        if (nodeText.includes("《《")) {
           emphasisLogger.debug("傍点記法を含むテキストノードを検出", {
-            text: text.substring(0, 50),
+            text: nodeText.substring(0, 50),
           });
 
           const fragment = document.createDocumentFragment();
           let lastIndex = 0;
 
-          const matches = text.matchAll(/《《([^》]+?)》》/g);
+          const matches = nodeText.matchAll(/《《([^》]+?)》》/g);
           for (const match of matches) {
             const [fullMatch, emphasisText] = match;
             const startIndex = match.index!;
@@ -40,7 +45,7 @@ export class EmphasisProcessor {
             // Add text before emphasis
             if (startIndex > lastIndex) {
               fragment.appendChild(
-                document.createTextNode(text.slice(lastIndex, startIndex))
+                document.createTextNode(nodeText.slice(lastIndex, startIndex))
               );
             }
 
@@ -58,17 +63,21 @@ export class EmphasisProcessor {
           }
 
           // Add remaining text
-          if (lastIndex < text.length) {
+          if (lastIndex < nodeText.length) {
             fragment.appendChild(
-              document.createTextNode(text.slice(lastIndex))
+              document.createTextNode(nodeText.slice(lastIndex))
             );
           }
 
           node.replaceWith(fragment);
         }
+
+        currentNode = walker.nextNode();
       }
 
       emphasisLogger.debug("傍点変換処理が完了");
+      return div.innerHTML;
+
     } catch (error) {
       emphasisLogger.error("傍点変換処理でエラーが発生", {
         error:
@@ -80,7 +89,6 @@ export class EmphasisProcessor {
               }
             : "Unknown error",
       });
-      // DOM操作の失敗は上位で処理する
       throw error;
     }
   }
