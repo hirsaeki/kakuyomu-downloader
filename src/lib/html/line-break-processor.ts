@@ -20,9 +20,20 @@ export class LineBreakProcessor {
         null
       );
 
+      // 改行を含むノードを先に収集
+      const nodesToProcess: Text[] = [];
       let currentNode = walker.nextNode();
       while (currentNode) {
         const node = currentNode as Text;
+        const text = node.textContent || '';
+        if (text.includes('\n')) {
+          nodesToProcess.push(node);
+        }
+        currentNode = walker.nextNode();
+      }
+
+      // 収集したノードを処理
+      for (const node of nodesToProcess) {
         const text = node.textContent || '';
         const lines = text.split('\n');
 
@@ -41,7 +52,6 @@ export class LineBreakProcessor {
           });
           node.remove();
         }
-        currentNode = walker.nextNode();
       }
 
       lineBreakLogger.debug('改行処理が完了');
