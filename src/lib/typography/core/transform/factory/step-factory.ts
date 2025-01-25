@@ -57,17 +57,12 @@ export class StepFactory {
           return new ConvertWidthStep(config.direction, config.target);
 
         case "convertKanji":
-          if (!config.target || !config.direction) {
-            throw new TransformError(
-              "Missing target or direction for convertKanji"
-            );
-          }
           return new ConvertKanjiStep();
+
         case "replace":
-          if (!config.from || !config.to) {
+          if (!config.from || config.to == null) {
             throw new TransformError("Missing from or to for replace");
-          }
-          return new ReplaceStep(config.from, config.to);
+          } else return new ReplaceStep(config.from, config.to);
 
         default:
           factoryLogger.warn(`Unknown action type: ${config.action}`);

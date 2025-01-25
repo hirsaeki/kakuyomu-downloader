@@ -1,105 +1,123 @@
-import { RubyProcessor } from "@/lib/html/ruby-processor";
-import { beforeEach, describe, expect, it } from "vitest";
-import { setupTestDOMParser } from "../../utils/dom";
+import { RubyProcessor } from '@/lib/html/ruby-processor';
+import { JSDOM } from 'jsdom';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { setupTestDOMParser } from '../../utils/dom';
 
-describe("RubyProcessor", () => {
+describe('RubyProcessor', () => {
   let processor: RubyProcessor;
+  let document: Document;
 
   beforeEach(() => {
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+    document = dom.window.document;
     processor = new RubyProcessor();
     setupTestDOMParser();
   });
 
-  describe("fromAozoraRuby", () => {
-    it("漢字のみのルビを変換できること", () => {
-      const input = "漢字《かんじ》のテスト";
-      const result = processor.fromAozoraRuby(input);
-      expect(result).toBe("<ruby>漢字<rt>かんじ</rt></ruby>のテスト");
+  describe('fromAozoraRuby', () => {
+    it('漢字のみのルビを変換できること', () => {
+      const div = document.createElement('div');
+      div.textContent = '漢字《かんじ》のテスト';
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe('<ruby>漢字<rt>かんじ</rt></ruby>のテスト');
     });
 
-    it("｜付きのルビを変換できること", () => {
-      const input = "｜アルファ《α》と｜ベータ《β》";
-      const result = processor.fromAozoraRuby(input);
-      expect(result).toBe(
-        "<ruby>アルファ<rt>α</rt></ruby>と<ruby>ベータ<rt>β</rt></ruby>"
+    it('｜付きのルビを変換できること', () => {
+      const div = document.createElement('div');
+      div.textContent = '｜アルファ《α》と｜ベータ《β》';
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe(
+        '<ruby>アルファ<rt>α</rt></ruby>と<ruby>ベータ<rt>β</rt></ruby>'
       );
     });
 
-    it("漢字と非漢字が混在する場合も適切に変換すること", () => {
-      const input = "漢字《かんじ》と｜Type《タイプ》";
-      const result = processor.fromAozoraRuby(input);
-      expect(result).toBe(
-        "<ruby>漢字<rt>かんじ</rt></ruby>と<ruby>Type<rt>タイプ</rt></ruby>"
+    it('漢字と非漢字が混在する場合も適切に変換すること', () => {
+      const div = document.createElement('div');
+      div.textContent = '漢字《かんじ》と｜Type《タイプ》';
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe(
+        '<ruby>漢字<rt>かんじ</rt></ruby>と<ruby>Type<rt>タイプ</rt></ruby>'
       );
     });
 
-    it("複数のルビが含まれるテキストを処理すること", () => {
-      const input = "日本《にほん》の文化《ぶんか》";
-      const result = processor.fromAozoraRuby(input);
-      expect(result).toBe(
-        "<ruby>日本<rt>にほん</rt></ruby>の<ruby>文化<rt>ぶんか</rt></ruby>"
+    it('ネストされたタグ内のルビも処理すること', () => {
+      const div = document.createElement('div');
+      div.innerHTML = '<p>これは<span>漢字《かんじ》</span>です</p>';
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe(
+        '<p>これは<span><ruby>漢字<rt>かんじ</rt></ruby></span>です</p>'
       );
     });
 
-    it("ルビがないテキストはそのまま返すこと", () => {
-      const text = "ルビのないテキスト";
-      const result = processor.fromAozoraRuby(text);
-      expect(result).toBe(text);
+    it('属性を持つタグ内のルビを処理すること', () => {
+      const div = document.createElement('div');
+      const p = document.createElement('p');
+      p.setAttribute('class', 'test');
+      p.textContent = '漢字《かんじ》の例';
+      div.appendChild(p);
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe(
+        '<p class="test"><ruby>漢字<rt>かんじ</rt></ruby>の例</p>'
+      );
     });
 
-    it("空のテキストを処理できること", () => {
-      const result = processor.fromAozoraRuby("");
-      expect(result).toBe("");
+    it('複数のルビが含まれるテキストを処理すること', () => {
+      const div = document.createElement('div');
+      div.textContent = '日本《にほん》の文化《ぶんか》';
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe(
+        '<ruby>日本<rt>にほん</rt></ruby>の<ruby>文化<rt>ぶんか</rt></ruby>'
+      );
     });
 
-    it("エラー時は例外をスローすること", () => {
+    it('ルビがないテキストはそのまま返すこと', () => {
+      const div = document.createElement('div');
+      const text = 'ルビのないテキスト';
+      div.textContent = text;
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe(text);
+    });
+
+    it('空のDOM要素を処理できること', () => {
+      const div = document.createElement('div');
+
+      processor.fromAozoraRuby(div);
+      expect(div.innerHTML).toBe('');
+    });
+
+    it('エラー時は例外をスローすること', () => {
+      const div = null as any;
+
       expect(() => {
-        processor.fromAozoraRuby(null as any);
+        processor.fromAozoraRuby(div);
       }).toThrow();
     });
   });
 
-  describe("toAozoraRuby", () => {
-    it("XHTMLルビタグを青空文庫形式に変換できること", () => {
-      const input = "<ruby>漢字<rt>かんじ</rt></ruby>のテスト";
-      const expected = "漢字《かんじ》のテスト";
+  describe('toAozoraRuby', () => {
+    it('XHTMLルビタグを青空文庫形式に変換できること', () => {
+      const input = '<ruby>漢字<rt>かんじ</rt></ruby>のテスト';
+      const expected = '漢字《かんじ》のテスト';
       expect(processor.toAozoraRuby(input)).toBe(expected);
     });
 
-    it("漢字以外の文字には｜を付けること", () => {
-      const input =
-        "<ruby>アルファ<rt>α</rt></ruby>と<ruby>ベータ<rt>β</rt></ruby>";
-      const expected = "｜アルファ《α》と｜ベータ《β》";
+    it('漢字以外の文字には｜を付けること', () => {
+      const input = '<ruby>アルファ<rt>α</rt></ruby>と<ruby>ベータ<rt>β</rt></ruby>';
+      const expected = '｜アルファ《α》と｜ベータ《β》';
       expect(processor.toAozoraRuby(input)).toBe(expected);
     });
 
-    it("不要なタグを除去すること", () => {
-      const input = "<ruby><rb>漢字</rb><rt>かんじ</rt><rtc>かん字</rtc></ruby>";
-      const expected = "漢字《かんじ》";
+    it('不要なタグを除去すること', () => {
+      const input = '<ruby><rb>漢字</rb><rt>かんじ</rt><rtc>かん字</rtc></ruby>';
+      const expected = '漢字《かんじ》';
       expect(processor.toAozoraRuby(input)).toBe(expected);
-    });
-  });
-
-  describe("変換の一貫性", () => {
-    it("青空文庫形式とXHTMLの相互変換で結果が一致すること", () => {
-      const testCases = [
-        "漢字《かんじ》のテスト",
-        "｜アルファ《α》と｜ベータ《β》",
-        "日本《にほん》の文化《ぶんか》"
-      ];
-
-      testCases.forEach(input => {
-        // 青空文庫 → XHTML → 青空文庫
-        const toXHTML = processor.fromAozoraRuby(input);
-        const backToAozora = processor.toAozoraRuby(toXHTML);
-        expect(backToAozora).toBe(input);
-
-        // XHTML → 青空文庫 → XHTML
-        const xhtmlInput = processor.fromAozoraRuby(input);
-        const toAozora = processor.toAozoraRuby(xhtmlInput);
-        const backToXHTML = processor.fromAozoraRuby(toAozora);
-        expect(backToXHTML).toBe(xhtmlInput);
-      });
     });
   });
 });

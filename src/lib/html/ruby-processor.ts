@@ -8,74 +8,65 @@ const rubyLogger = createContextLogger('ruby-processor');
 export class RubyProcessor {
   /**
    * 青空文庫形式のルビ記法をXHTMLルビタグに変換する
-   * @param text 青空文庫形式のルビ記法を含むテキスト
-   * @returns XHTMLルビタグに変換されたテキスト
+   * @param element 対象のDOM要素
    */
-  fromAozoraRuby(text: string): string {
-    rubyLogger.debug('ルビ変換処理を開始', { textLength: text.length });
+  fromAozoraRuby(element: HTMLElement): void {
+    rubyLogger.debug('ルビ変換処理を開始', { elementId: element.id });
 
     try {
-      const div = document.createElement('div');
-      div.textContent = text;
-
       const walker = document.createTreeWalker(
-        div,
+        element,
         NodeFilter.SHOW_TEXT,
         null
       );
 
+      const nodesToProcess: Text[] = [];
       let currentNode = walker.nextNode();
       while (currentNode) {
         const node = currentNode as Text;
-        const nodeText = node.textContent || '';
-
-        if (nodeText.includes('《')) {
-          rubyLogger.debug('ルビ記法を含むテキストノードを検出', {
-            text: nodeText.substring(0, 50)
-          });
-
-          const fragment = document.createDocumentFragment();
-          let lastIndex = 0;
-
-          // ｜付きと漢字のみの両方のパターンを処理
-          const matches = nodeText.matchAll(/(｜([^《]+?)|([一-龯々]+))《([^》]+?)》/g);
-          for (const match of matches) {
-            const [fullMatch, _, p1, kanji, rubyText] = match;
-            const startIndex = match.index!;
-
-            // Add text before ruby
-            if (startIndex > lastIndex) {
-              fragment.appendChild(
-                document.createTextNode(nodeText.slice(lastIndex, startIndex))
-              );
-            }
-
-            // Add ruby element
-            const ruby = document.createElement('ruby');
-            ruby.textContent = p1 || kanji;  // 本文
-            const rt = document.createElement('rt');
-            rt.textContent = rubyText;  // ルビ
-            ruby.appendChild(rt);
-            fragment.appendChild(ruby);
-
-            lastIndex = startIndex + fullMatch.length;
-          }
-
-          // Add remaining text
-          if (lastIndex < nodeText.length) {
-            fragment.appendChild(
-              document.createTextNode(nodeText.slice(lastIndex))
-            );
-          }
-
-          node.replaceWith(fragment);
+        const text = node.textContent || '';
+        if (text.includes('《')) {
+          nodesToProcess.push(node);
         }
-
         currentNode = walker.nextNode();
       }
 
+      for (const node of nodesToProcess) {
+        const text = node.textContent || '';
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+
+        const matches = text.matchAll(/(｜([^《]+?)|([一-龯々]+))《([^》]+?)》/g);
+        for (const match of matches) {
+          const [fullMatch, _, p1, kanji, rubyText] = match;
+          const startIndex = match.index!;
+
+          if (startIndex > lastIndex) {
+            fragment.appendChild(
+              document.createTextNode(text.slice(lastIndex, startIndex))
+            );
+          }
+
+          const ruby = document.createElement('ruby');
+          ruby.textContent = p1 || kanji;
+          const rt = document.createElement('rt');
+          rt.textContent = rubyText;
+          ruby.appendChild(rt);
+          fragment.appendChild(ruby);
+
+          lastIndex = startIndex + fullMatch.length;
+        }
+
+        if (lastIndex < text.length) {
+          fragment.appendChild(
+            document.createTextNode(text.slice(lastIndex))
+          );
+        }
+
+        node.replaceWith(fragment);
+      }
+
       rubyLogger.debug('ルビ変換処理が完了');
-      return div.innerHTML;
 
     } catch (error) {
       rubyLogger.error('ルビ変換処理でエラーが発生', {
@@ -118,15 +109,5 @@ export class RubyProcessor {
     });
 
     return result;
-  }
-
-  /**
-   * クラスメソッドとしてのtoAozoraRuby
-   * @param html XHTMLルビタグを含むテキスト
-   * @returns 青空文庫形式のルビ記法に変換されたテキスト
-   */
-  static toAozoraRuby(html: string): string {
-    const processor = new RubyProcessor();
-    return processor.toAozoraRuby(html);
   }
 }

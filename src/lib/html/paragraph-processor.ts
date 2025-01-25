@@ -32,9 +32,9 @@ class ParagraphProcessor {
     if (!html) return html;
 
     // ブラウザ提供のDOMParserを使用
-    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const doc = new DOMParser().parseFromString(html, "text/html");
     // textContentで純粋なテキストを取得（改行やスペースは保持される）
-    return doc.body.textContent || '';
+    return doc.body.textContent || "";
   }
 
   /**
@@ -67,8 +67,11 @@ class ParagraphProcessor {
       }
 
       // 段落区切り判定(空行の閾値越え)
-      if (emptyLineCount >= this.options.minEmptyLines && currentParagraph.length > 0) {
-        processedLines.push(this.wrapParagraph(currentParagraph.join('\n')));
+      if (
+        emptyLineCount >= this.options.minEmptyLines &&
+        currentParagraph.length > 0
+      ) {
+        processedLines.push(this.wrapParagraph(currentParagraph.join("\n")));
         currentParagraph = [];
       }
 
@@ -78,11 +81,11 @@ class ParagraphProcessor {
 
     // 最後の段落の処理
     if (currentParagraph.length > 0) {
-      processedLines.push(this.wrapParagraph(currentParagraph.join('\n')));
+      processedLines.push(this.wrapParagraph(currentParagraph.join("\n")));
     }
 
-    // 段落間に改行を入れて結合（後続のLineBreakProcessorで<br />に変換される）
-    const result = processedLines.join('\n\n');
+    // 段落間に段落区切効果を入れて結合（後続のLineBreakProcessorで<br />に変換される）
+    const result = processedLines.join("\n\n　　　◇\n\n");
 
     if (this.options.debug) {
       paragraphLogger.debug("Processed text:", {
