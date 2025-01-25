@@ -1,19 +1,24 @@
-import JSZip from 'jszip';
-import { ValidationError } from '@/lib/errors/validation';
-import { GenerationError } from '@/lib/errors/generation';
-import { TypographyProcessor } from '@/lib/typography/core/processor';
-import { XHTMLDocumentBuilder } from './document-builder';
-import { InputChapter } from '../types';
-import EPUB_CONFIG from '@/config/epub';
-import { createContextLogger } from '@/lib/logger';
-import { patterns } from 'virtual:pattern-config';
-import { TcyConverter, RubyProcessor, LineBreakProcessor } from '@/lib/html';
+import EPUB_CONFIG from "@/config/epub";
+import { GenerationError } from "@/lib/errors/generation";
+import { ValidationError } from "@/lib/errors/validation";
+import {
+  EmphasisProcessor,
+  LineBreakProcessor,
+  RubyProcessor,
+  TcyConverter,
+} from "@/lib/html";
+import { createContextLogger } from "@/lib/logger";
+import { TypographyProcessor } from "@/lib/typography/core/processor";
+import JSZip from "jszip";
+import { patterns } from "virtual:pattern-config";
+import { InputChapter } from "../types";
+import { XHTMLDocumentBuilder } from "./document-builder";
 
 interface ContentGeneratorOptions {
   useGroupTitles?: boolean;
 }
 
-const contentLogger = createContextLogger('epub-content');
+const contentLogger = createContextLogger("epub-content");
 
 /**
  * 生成処理の過程で使用する中間チャプター情報
@@ -30,18 +35,20 @@ export class ContentGenerator {
   private readonly typographyProcessor: TypographyProcessor;
   private readonly documentBuilder: XHTMLDocumentBuilder;
   private readonly rubyProcessor: RubyProcessor;
+  private readonly emphasisProcessor: EmphasisProcessor;
   private readonly tcyConverter: TcyConverter;
   private readonly lineBreakProcessor: LineBreakProcessor;
   private readonly domParser: DOMParser;
 
   constructor() {
-    contentLogger.debug('ContentGeneratorを初期化');
+    contentLogger.debug("ContentGeneratorを初期化");
     this.domParser = new DOMParser();
     this.typographyProcessor = TypographyProcessor.getInstance(
       Object.values(patterns)
     );
     this.documentBuilder = new XHTMLDocumentBuilder(EPUB_CONFIG);
     this.rubyProcessor = new RubyProcessor();
+    this.emphasisProcessor = new EmphasisProcessor();
     this.tcyConverter = new TcyConverter();
     this.lineBreakProcessor = new LineBreakProcessor();
   }
@@ -55,14 +62,14 @@ export class ContentGenerator {
     aborted: boolean = false,
     options?: ContentGeneratorOptions
   ): Promise<GeneratedChapter[]> {
-    contentLogger.info('チャプター生成を開始', {
-      chaptersCount: chapters.length
+    contentLogger.info("チャプター生成を開始", {
+      chaptersCount: chapters.length,
     });
 
-    const oebps = zip.folder('OEBPS');
+    const oebps = zip.folder("OEBPS");
     if (!oebps) {
-      contentLogger.error('OEBPSフォルダの作成に失敗');
-      throw new GenerationError('OEBPSフォルダが見つかりません');
+      contentLogger.error("OEBPSフォルダの作成に失敗");
+      throw new GenerationError("OEBPSフォルダが見つかりません");
     }
 
     const generatedChapters: GeneratedChapter[] = [];
@@ -71,11 +78,11 @@ export class ContentGenerator {
 
     for (let i = 0; i < chapters.length; i++) {
       if (aborted) {
-        contentLogger.warn('チャプター生成が中断されました', {
+        contentLogger.warn("チャプター生成が中断されました", {
           currentIndex: i,
-          totalChapters: chapters.length
+          totalChapters: chapters.length,
         });
-        throw new GenerationError('チャプター生成が中断されました');
+        throw new GenerationError("チャプター生成が中断されました");
       }
 
       // 進捗ログ（10チャプターごと）
@@ -85,48 +92,56 @@ export class ContentGenerator {
       }
 
       const chapter = chapters[i];
-      contentLogger.debug('チャプター処理開始', {
+      contentLogger.debug("チャプター処理開始", {
         index: i + 1,
-        title: chapter.title
+        title: chapter.title,
       });
 
       try {
         await this.validateChapter(chapter, i);
-        const displayTitle = options?.useGroupTitles && chapter.metadata?.groupTitle
-          ? `${chapter.metadata.groupTitle} ${chapter.title}`
-          : chapter.title;
-        const generated = await this.generateChapter(chapter, i, oebps, displayTitle);
+        const displayTitle =
+          options?.useGroupTitles && chapter.metadata?.groupTitle
+            ? `${chapter.metadata.groupTitle} ${chapter.title}`
+            : chapter.title;
+        const generated = await this.generateChapter(
+          chapter,
+          i,
+          oebps,
+          displayTitle
+        );
 
         generatedChapters.push(generated);
-
       } catch (error) {
-        contentLogger.error('チャプター生成エラー', {
-          error: error instanceof Error ? {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-          } : 'Unknown error',
+        contentLogger.error("チャプター生成エラー", {
+          error:
+            error instanceof Error
+              ? {
+                  name: error.name,
+                  message: error.message,
+                  stack: error.stack,
+                }
+              : "Unknown error",
           chapter: {
             index: i + 1,
             title: chapter.title,
-            dataLength: chapter.data.length
-          }
+            dataLength: chapter.data.length,
+          },
         });
         throw new GenerationError(
           `Chapter ${i + 1} "${chapter.title}" の生成に失敗: ${
-            error instanceof Error ? error.message : '不明なエラー'
+            error instanceof Error ? error.message : "不明なエラー"
           }`
         );
       }
     }
 
     if (generatedChapters.length === 0) {
-      contentLogger.error('有効なチャプターが存在しません');
-      throw new ValidationError('有効なチャプターがありません');
+      contentLogger.error("有効なチャプターが存在しません");
+      throw new ValidationError("有効なチャプターがありません");
     }
 
-    contentLogger.info('チャプター生成完了', {
-      generatedCount: generatedChapters.length
+    contentLogger.info("チャプター生成完了", {
+      generatedCount: generatedChapters.length,
     });
 
     return generatedChapters;
@@ -141,89 +156,103 @@ export class ContentGenerator {
     oebps: JSZip,
     displayTitle?: string
   ): Promise<GeneratedChapter> {
-    const chapterNum = (index + 1).toString().padStart(3, '0');
+    const chapterNum = (index + 1).toString().padStart(3, "0");
     const filename = `${EPUB_CONFIG.FILE_STRUCTURE.CHAPTER_PREFIX}${chapterNum}.xhtml`;
 
-    contentLogger.debug('チャプター変換開始', {
+    contentLogger.debug("チャプター変換開始", {
       title: chapter.title,
       chapterNum,
-      dataLength: chapter.data.length
+      dataLength: chapter.data.length,
     });
 
     try {
-      // Prepare content with title
+      // コンテンツの準備
       const cleanTitle = this.sanitizeContent(displayTitle ?? chapter.title);
       const cleanContent = this.sanitizeContent(chapter.data);
       const contentWithTitle = `<h1>${cleanTitle}</h1>\n${cleanContent}`;
 
-      contentLogger.debug('コンテンツ準備完了', {
+      contentLogger.debug("コンテンツ準備完了", {
         contentLength: contentWithTitle.length,
-        firstChars: contentWithTitle.substring(0, 100)
+        firstChars: contentWithTitle.substring(0, 100),
       });
 
-      // Process typography
-      const typographyProcessed = await this.processContentWithStructure(contentWithTitle);
+      // Typography処理
+      const typographyProcessed =
+        await this.processTypography(contentWithTitle);
 
-      contentLogger.debug('Typography処理完了', {
-        type: typeof typographyProcessed,
-        length: typographyProcessed.length,
-        firstChars: typographyProcessed.substring(0, 100)
+      // DOM文書の作成とHTML処理
+      const doc = this.domParser.parseFromString(
+        typographyProcessed,
+        "text/html"
+      );
+      let processed = doc.body.innerHTML;
+      processed = this.rubyProcessor.fromAozoraRuby(processed);
+      processed = this.emphasisProcessor.fromEmphasisNotation(processed);
+      const newDoc = this.domParser.parseFromString(processed, "text/html");
+      this.lineBreakProcessor.insertLineBreaks(newDoc.body);
+      processed = newDoc.body.innerHTML;
+
+      contentLogger.debug("HTML処理完了", {
+        processedLength: processed.length,
+        sampleProcessed: processed.substring(0, 100),
       });
 
-      // ルビ変換とTCY処理
-      const rubyConverted = this.rubyProcessor.fromAozoraRuby(typographyProcessed);
-      const tcyConverted = this.tcyConverter.process(rubyConverted);
+      // TCY処理
+      const tcyConverted = this.tcyConverter.process(processed);
 
-      contentLogger.debug('後処理完了', {
-        textLength: tcyConverted.length,
-        firstChars: tcyConverted.substring(0, 100)
-      });
+      // 最終的なドキュメントの作成
+      const finalDoc = this.documentBuilder.createDocument(
+        chapter.title,
+        tcyConverted
+      );
 
-      // Create and validate document
-      const doc = this.documentBuilder.createDocument(chapter.title, tcyConverted);
-      
       // Additional debug information
-      const contentDiv = doc.querySelector('.content');
-      contentLogger.debug('ドキュメント生成後の状態', {
+      const contentDiv = finalDoc.querySelector(".content");
+      contentLogger.debug("ドキュメント生成後の状態", {
         hasContentDiv: !!contentDiv,
         hasContent: contentDiv?.hasChildNodes(),
         contentLength: contentDiv?.textContent?.length,
-        firstChars: contentDiv?.textContent?.substring(0, 100)
+        firstChars: contentDiv?.textContent?.substring(0, 100),
       });
 
       if (!contentDiv?.hasChildNodes()) {
-        throw new Error('Generated document has no content');
+        throw new Error("Generated document has no content");
       }
-      
-      // Serialize and add to ZIP
-      const serialized = new XMLSerializer().serializeToString(doc);
-      if (!serialized || serialized.indexOf('<div class="content"></div>') !== -1) {
-        throw new Error('Content serialization failed - empty result');
+
+      // シリアライズしてZIPに追加
+      const serialized = new XMLSerializer().serializeToString(finalDoc);
+      if (
+        !serialized ||
+        serialized.indexOf('<div class="content"></div>') !== -1
+      ) {
+        throw new Error("Content serialization failed - empty result");
       }
-      
+
       oebps.file(filename, serialized);
 
-      contentLogger.debug('チャプター変換完了', {
+      contentLogger.debug("チャプター変換完了", {
         title: chapter.title,
         filename,
         serializedLength: serialized.length,
-        firstChars: serialized.substring(0, 100)
+        firstChars: serialized.substring(0, 100),
       });
 
       return {
         filename,
-        title: chapter.title
-      };
-
-    } catch (error) {
-      contentLogger.error('チャプター変換エラー', {
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : 'Unknown error',
         title: chapter.title,
-        dataLength: chapter.data.length
+      };
+    } catch (error) {
+      contentLogger.error("チャプター変換エラー", {
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              }
+            : "Unknown error",
+        title: chapter.title,
+        dataLength: chapter.data.length,
       });
       throw error;
     }
@@ -234,25 +263,25 @@ export class ContentGenerator {
    */
   private validateChapter(chapter: InputChapter, index: number): void {
     if (!chapter.title?.trim()) {
-      contentLogger.warn('無効なチャプター: タイトルが空', { index: index + 1 });
+      contentLogger.warn("無効なチャプター: タイトルが空", {
+        index: index + 1,
+      });
       throw new ValidationError(
-        `Chapter ${index + 1}: タイトルが設定されていません`,
+        `Chapter ${index + 1}: タイトルが設定されていません`
       );
     }
     if (!chapter.data?.trim()) {
-      contentLogger.warn('無効なチャプター: コンテンツが空', {
+      contentLogger.warn("無効なチャプター: コンテンツが空", {
         index: index + 1,
-        title: chapter.title
+        title: chapter.title,
       });
-      throw new ValidationError(
-        `Chapter ${index + 1}: コンテンツが空です`,
-      );
+      throw new ValidationError(`Chapter ${index + 1}: コンテンツが空です`);
     }
 
-    contentLogger.debug('チャプターバリデーション完了', {
+    contentLogger.debug("チャプターバリデーション完了", {
       index: index + 1,
       title: chapter.title,
-      dataLength: chapter.data.length
+      dataLength: chapter.data.length,
     });
   }
 
@@ -262,74 +291,64 @@ export class ContentGenerator {
   private sanitizeContent(content: string): string {
     const sanitized = content
       .trim()
-      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '') // Remove invalid XML characters
-      .replace(/\r\n|\r/g, '\n'); // Normalize line endings
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "") // Remove invalid XML characters
+      .replace(/\r\n|\r/g, "\n"); // Normalize line endings
 
     if (!sanitized) {
-      throw new Error('Content sanitization resulted in empty string');
+      throw new Error("Content sanitization resulted in empty string");
     }
 
     return sanitized;
   }
 
   /**
-   * HTMLの構造を保持しながらテキストノードのみを処理
+   * Typography処理のみを行う
    */
-  private async processContentWithStructure(content: string): Promise<string> {
-    contentLogger.debug('構造を保持した処理を開始', {
+  private async processTypography(content: string): Promise<string> {
+    contentLogger.debug("Typography処理を開始", {
       contentLength: content.length,
-      firstChars: content.substring(0, 100)
+      firstChars: content.substring(0, 100),
     });
 
-    const doc = this.domParser.parseFromString(content, 'text/html');
-    
-    // テキストノードを再帰的に処理する関数
-    const processTextNodes = async (node: Node): Promise<void> => {
-      // テキストノードの場合
-      if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-        try {
-          // テキストノードの内容のみを処理
-          const processedText = await this.typographyProcessor.process(node.textContent);
-          // 改行処理もテキストノードごとに行う
-          const lineBreakProcessed = this.lineBreakProcessor.process(processedText);
-          node.textContent = lineBreakProcessed;
-
-          contentLogger.debug('テキストノード処理完了', {
-            original: node.textContent?.substring(0, 50),
-            processed: processedText.substring(0, 50)
-          });
-        } catch (error) {
-          contentLogger.warn('テキストノード処理でエラー発生', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            text: node.textContent?.substring(0, 50)
-          });
-        }
-      }
-
-      // 子ノードを再帰的に処理
-      for (const child of Array.from(node.childNodes)) {
-        await processTextNodes(child);
-      }
-    };
-
     try {
-      // body以下のノードを処理
+      const doc = this.domParser.parseFromString(content, "text/html");
+
+      const processTextNodes = async (node: Node): Promise<void> => {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+          try {
+            node.textContent = await this.typographyProcessor.process(
+              node.textContent
+            );
+
+            contentLogger.debug("テキストノード処理完了", {
+              processed: node.textContent.substring(0, 50),
+            });
+          } catch (error) {
+            contentLogger.warn("テキストノード処理でエラー発生", {
+              error: error instanceof Error ? error.message : "Unknown error",
+              text: node.textContent?.substring(0, 50),
+            });
+            throw error;
+          }
+        }
+
+        for (const child of Array.from(node.childNodes)) {
+          await processTextNodes(child);
+        }
+      };
+
       await processTextNodes(doc.body);
-
-      const result = doc.body.innerHTML;
-      contentLogger.debug('構造を保持した処理が完了', {
-        resultLength: result.length,
-        firstChars: result.substring(0, 100)
-      });
-
-      return result;
+      return doc.body.innerHTML;
     } catch (error) {
-      contentLogger.error('構造を保持した処理でエラー発生', {
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : 'Unknown error'
+      contentLogger.error("Typography処理でエラー発生", {
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              }
+            : "Unknown error",
       });
       throw error;
     }
