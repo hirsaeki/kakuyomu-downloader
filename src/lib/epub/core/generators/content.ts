@@ -284,36 +284,27 @@ export class ContentGenerator {
   private async processTypography(content: string): Promise<string> {
     contentLogger.debug('Typography処理を開始', {
       contentLength: content.length,
-      firstChars: content.substring(0, 100)
+      firstChars: content.substring(0, 100),
+      hasRuby: content.includes('《'),
+      hasTcy: /[0-9０-９]{2}(?![0-9０-９])/.test(content)
     });
 
     try {
+      // DOMパースしてbody内のHTMLを取得（これにより最外のタグは除外される）
       const doc = this.domParser.parseFromString(content, 'text/html');
+      const bodyContent = doc.body.innerHTML;
 
-      const processTextNodes = async (node: Node): Promise<void> => {
-        if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-          try {
-            node.textContent = await this.typographyProcessor.process(node.textContent);
+      // Typography処理を実行
+      const processed = await this.typographyProcessor.process(bodyContent);
 
-            contentLogger.debug('テキストノード処理完了', {
-              processed: node.textContent.substring(0, 50)
-            });
-          } catch (error) {
-            contentLogger.warn('テキストノード処理でエラー発生', {
-              error: error instanceof Error ? error.message : 'Unknown error',
-              text: node.textContent?.substring(0, 50)
-            });
-            throw error;
-          }
-        }
+      contentLogger.debug('Typography処理完了', {
+        processedLength: processed.length,
+        sampleProcessed: processed.substring(0, 100),
+        rubyCount: (processed.match(/<ruby>/g) || []).length,
+        tcyCount: (processed.match(/<span class="tcy">/g) || []).length
+      });
 
-        for (const child of Array.from(node.childNodes)) {
-          await processTextNodes(child);
-        }
-      };
-
-      await processTextNodes(doc.body);
-      return doc.body.innerHTML;
+      return processed;
 
     } catch (error) {
       contentLogger.error('Typography処理でエラー発生', {

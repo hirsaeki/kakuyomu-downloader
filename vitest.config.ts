@@ -1,8 +1,10 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
 import * as path from 'path';
+import { yamlPatternTransformerPlugin } from './tools/vite/plugins/yaml-to-patterns';
 
 export default defineConfig({
+  plugins: [yamlPatternTransformerPlugin()],
   test: {
     globals: true,
     environment: 'jsdom',
