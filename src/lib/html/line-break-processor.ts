@@ -20,8 +20,9 @@ export class LineBreakProcessor {
         null
       );
 
-      let node: Text | null;
-      while (node = walker.nextNode() as Text) {
+      let currentNode = walker.nextNode();
+      while (currentNode) {
+        const node = currentNode as Text;
         const text = node.textContent || '';
         const lines = text.split('\n');
 
@@ -35,10 +36,12 @@ export class LineBreakProcessor {
             node.before(document.createTextNode(line));
             if (index < lines.length - 1) {
               node.before(document.createElement('br'));
+              node.before(document.createTextNode('\n'));
             }
           });
           node.remove();
         }
+        currentNode = walker.nextNode();
       }
 
       lineBreakLogger.debug('改行処理が完了');

@@ -1,33 +1,24 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { JSDOM } from "jsdom";
 import { LineBreakProcessor } from "@/lib/html/line-break-processor";
+import { JSDOM } from "jsdom";
+import { beforeEach, describe, expect, it } from "vitest";
+import { setupTestDOMParser } from "../../utils/dom";
 
 describe("LineBreakProcessor", () => {
   let processor: LineBreakProcessor;
-  let document: Document;
 
   beforeEach(() => {
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    document = dom.window.document;
     processor = new LineBreakProcessor();
-
-    // DOMParserのモック
-    global.DOMParser = class DOMParser {
-      parseFromString(string: string, _: string) {
-        return new JSDOM(string).window.document;
-      }
-    } as any;
+    setupTestDOMParser();
   });
 
   describe("insertLineBreaks", () => {
-    it("プレーンテキストの改行を<br>タグに変換すること", () => {
+    it("プレーンテキストの改行を<br />\\nに変換すること", () => {
       const div = document.createElement('div');
       div.textContent = "これは\n改行を含む\nテキストです";
       
       processor.insertLineBreaks(div);
       
-      // textContentではなくinnerHTMLを使用して<br>タグを確認
-      expect(div.innerHTML).toBe("これは<br>改行を含む<br>テキストです");
+      expect(div.innerHTML).toBe("これは<br>\n改行を含む<br>\nテキストです");
     });
 
     it("複数のテキストノードの改行を処理すること", () => {
@@ -42,7 +33,7 @@ describe("LineBreakProcessor", () => {
 
       processor.insertLineBreaks(div);
 
-      expect(div.innerHTML).toBe("<p>最初の<br>段落</p><p>次の<br>段落</p>");
+      expect(div.innerHTML).toBe("<p>最初の<br>\n段落</p><p>次の<br>\n段落</p>");
     });
 
     it("ネストされたタグ内の改行を処理すること", () => {
@@ -51,7 +42,7 @@ describe("LineBreakProcessor", () => {
 
       processor.insertLineBreaks(div);
 
-      expect(div.innerHTML).toBe("<span>これは<br>ネストされた<br>テキスト</span>");
+      expect(div.innerHTML).toBe("<span>これは<br>\nネストされた<br>\nテキスト</span>");
     });
 
     it("属性を持つタグ内の改行を処理すること", () => {
@@ -63,7 +54,7 @@ describe("LineBreakProcessor", () => {
 
       processor.insertLineBreaks(div);
 
-      expect(div.innerHTML).toBe('<p class="test">属性付き<br>タグ</p>');
+      expect(div.innerHTML).toBe('<p class="test">属性付き<br>\nタグ</p>');
     });
 
     it("改行を含まないテキストはそのまま返すこと", () => {
@@ -81,7 +72,7 @@ describe("LineBreakProcessor", () => {
 
       processor.insertLineBreaks(div);
 
-      expect(div.innerHTML).toBe("これは<br><br>連続した<br><br>改行です");
+      expect(div.innerHTML).toBe("これは<br>\n<br>\n連続した<br>\n<br>\n改行です");
     });
 
     it("タグの間の改行も正しく処理すること", () => {
@@ -90,7 +81,7 @@ describe("LineBreakProcessor", () => {
 
       processor.insertLineBreaks(div);
 
-      expect(div.innerHTML).toBe("<p>最初</p><br><br><p>次</p>");
+      expect(div.innerHTML).toBe("<p>最初</p><br>\n<br>\n<p>次</p>");
     });
 
     it("空のDOM要素を処理できること", () => {
